@@ -3,7 +3,7 @@ from aiogram import Bot, Dispatcher
 from app.databases.user_database import user_database
 from app.databases.categories_database import categories_database
 from app.handlers.user_handlers import user_router
-from app.common.token import TOKEN
+from secure.token import TOKEN
 
 bot = Bot(token=TOKEN)
 
