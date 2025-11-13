@@ -48,10 +48,6 @@ main_categories = {
         "path": "contacts",
         "extensions": ["vcf", "txt"]
     },
-    "Other": {
-        "path": "other",
-        "extensions": []
-    }
 }
 
 translations = {
