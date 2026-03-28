@@ -1,9 +1,16 @@
 import asyncio
+import os
+from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher
 from app.databases.user_database import user_database
 from app.databases.categories_database import categories_database
 from app.handlers.user_handlers import user_router
-from secure.token import TOKEN
+
+load_dotenv()
+TOKEN = os.getenv("BOT_TOKEN")
+
+if not TOKEN:
+    raise ValueError("BOT_TOKEN is not set in .env file")
 
 bot = Bot(token=TOKEN)
 

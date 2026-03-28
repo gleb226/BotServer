@@ -1,40 +1,19 @@
-import sqlite3
-
 from datetime import datetime
 from functools import wraps
-
-from app.common.config import ERRORS_DB_PATH
+from app.databases.mongodb_client import errors_collection
 
 
 def log_error_to_db(user_id: int, username: str, firstname: str, lastname: str, command: str, error_message: str):
-    conn = sqlite3.connect(ERRORS_DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute(
-        """CREATE TABLE IF NOT EXISTS errors (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, 
-            user_id INTEGER, 
-            username TEXT, 
-            firstname TEXT, 
-            lastname TEXT, 
-            command TEXT, 
-            error_message TEXT, 
-            timestamp TEXT
-        )"""
-    )
-    cursor.execute(
-        "INSERT INTO errors (user_id, username, firstname, lastname, command, error_message, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (
-            user_id,
-            username,
-            firstname,
-            lastname,
-            command,
-            error_message,
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        ),
-    )
-    conn.commit()
-    conn.close()
+    error_data = {
+        "user_id": user_id,
+        "username": username,
+        "firstname": firstname,
+        "lastname": lastname,
+        "command": command,
+        "error_message": error_message,
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+    errors_collection.insert_one(error_data)
 
 
 def error_handler(command: str):
