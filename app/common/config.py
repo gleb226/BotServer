@@ -1,4 +1,7 @@
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 BASE_DIR = os.getcwd()
 
@@ -11,6 +14,8 @@ USER_FILES_DIR = os.path.join(BASE_DIR, "user_files")
 USERS_DB_PATH = os.path.join(DB_DIR, "users.db")
 ERRORS_DB_PATH = os.path.join(DB_DIR, "errors.db")
 CATEGORIES_DB_PATH = os.path.join(DB_DIR, "categories.db")
+
+DATABASE_TYPE = os.getenv("DATABASE_TYPE", "sqlite")
 
 os.makedirs(DB_DIR, exist_ok=True)
 os.makedirs(USER_FILES_DIR, exist_ok=True)
