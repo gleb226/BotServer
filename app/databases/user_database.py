@@ -18,12 +18,20 @@ class user_database:
             "last_name": last_name,
             "username": username,
             "language_code": language_code,
+            "language": "English",
             "is_premium": bool(is_premium),
             "chat_id": chat_id,
             "chat_type": chat_type,
             "joined_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
         self.collection.insert_one(user_data)
+
+    def set_language(self, user_id: int, language: str):
+        self.collection.update_one({"user_id": user_id}, {"$set": {"language": language}})
+
+    def get_language(self, user_id: int):
+        user = self.collection.find_one({"user_id": user_id})
+        return user.get("language", "English") if user else "English"
 
     def get_users_table(self):
         users = list(self.collection.find())
@@ -38,13 +46,14 @@ class user_database:
                 u.get("last_name"), 
                 u.get("username"), 
                 u.get("language_code"), 
+                u.get("language"),
                 u.get("is_premium"), 
                 u.get("chat_id"), 
                 u.get("chat_type"),
                 u.get("joined_at")
             ])
             
-        headers = ["User ID", "First Name", "Last Name", "Username", "Language", "Premium", "Chat ID", "Chat Type", "Joined At"]
+        headers = ["User ID", "First Name", "Last Name", "Username", "Language Code", "Selected Language", "Premium", "Chat ID", "Chat Type", "Joined At"]
         return tabulate(data, headers=headers, tablefmt="grid")
 
     def get_user(self, user_id: int):

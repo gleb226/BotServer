@@ -16,15 +16,14 @@ user_router = Router()
 cat_db = categories_database()
 db = user_database()
 
-
 class FileAction(CallbackData, prefix="f"):
     action: str
     category: str
     subcategory: str = ""
     filename: str = ""
 
-
 class UserStates(StatesGroup):
+    selecting_language = State()
     waiting_for_file = State()
     waiting_for_text = State()
     waiting_for_subcategory_name = State()
@@ -32,18 +31,11 @@ class UserStates(StatesGroup):
     selecting_subcategory = State()
     deleting_subcategory = State()
 
-
 @user_router.message(Command("start"))
 async def start_command(message: Message, state: FSMContext):
     try:
         user_id = message.from_user.id
         user_selections[user_id] = {"category": None, "subcategory_path": []}
-
-        await message.answer(
-            translations["English"]["welcome"],
-            reply_markup=kb.get_categories_keyboard()
-        )
-        await state.set_state(UserStates.selecting_category)
 
         db.add_user(
             user_id=message.from_user.id,
@@ -55,38 +47,62 @@ async def start_command(message: Message, state: FSMContext):
             chat_id=message.chat.id,
             chat_type=message.chat.type
         )
+
+        lang = db.get_language(user_id)
+        await message.answer(translations[lang]["select_language"], reply_markup=kb.get_language_keyboard())
+        await state.set_state(UserStates.selecting_language)
     except Exception as e:
         log_error_to_db(message.from_user.id, message.from_user.username or "N/A",
                         message.from_user.first_name or "N/A", message.from_user.last_name or "N/A",
                         "/start", str(e))
         await message.answer("Function is currently unavailable. Please try again later.")
 
+@user_router.message(Command("language"))
+async def language_command(message: Message, state: FSMContext):
+    user_id = message.from_user.id
+    lang = db.get_language(user_id)
+    await message.answer(translations[lang]["select_language"], reply_markup=kb.get_language_keyboard())
+    await state.set_state(UserStates.selecting_language)
+
+@user_router.message(UserStates.selecting_language)
+async def select_language(message: Message, state: FSMContext):
+    user_id = message.from_user.id
+    selected_lang = message.text
+    if selected_lang not in ["English", "Ukrainian"]:
+        await message.answer("Please select a language from the menu.")
+        return
+    
+    db.set_language(user_id, selected_lang)
+    await message.answer(translations[selected_lang]["welcome"], reply_markup=kb.get_categories_keyboard())
+    await state.set_state(UserStates.selecting_category)
 
 @user_router.message(UserStates.selecting_category)
 async def select_category(message: Message, state: FSMContext):
     try:
         user_id = message.from_user.id
         category = message.text
+        lang = db.get_language(user_id)
+        t = translations[lang]
 
         if category not in main_categories:
-            await message.answer("Invalid category. Please select from the menu.")
+            await message.answer(t["invalid_category"])
             return
 
         user_selections[user_id] = {"category": category, "subcategory_path": []}
 
         buttons = [
             [
-                InlineKeyboardButton(text="View Files", callback_data=FileAction(action="view", category=category, subcategory="").pack()),
-                InlineKeyboardButton(text="Delete Files", callback_data=FileAction(action="delete_menu", category=category, subcategory="").pack())
+                InlineKeyboardButton(text=t["view_files"], callback_data=FileAction(action="view", category=category, subcategory="").pack()),
+                InlineKeyboardButton(text=t["delete_files"], callback_data=FileAction(action="delete_menu", category=category, subcategory="").pack())
             ]
         ]
         markup = InlineKeyboardMarkup(inline_keyboard=buttons)
 
         await message.answer(
-            "Send files or manage subcategories",
-            reply_markup=kb.get_subcategories_keyboard(user_id, category, "")
+            t["select_subcategory"],
+            reply_markup=kb.get_subcategories_keyboard(user_id, category, "", language=lang)
         )
-        await message.answer("File actions:", reply_markup=markup)
+        await message.answer(t["file_actions"], reply_markup=markup)
 
         if category in ["Passwords", "Contacts"]:
             await state.set_state(UserStates.waiting_for_text)
@@ -98,40 +114,41 @@ async def select_category(message: Message, state: FSMContext):
                         "select_category", str(e))
         await message.answer("Function is currently unavailable. Please try again later.")
 
-
 @user_router.message(UserStates.waiting_for_text, F.text)
 async def handle_text(message: Message, state: FSMContext):
     try:
         user_id = message.from_user.id
         text = message.text
+        lang = db.get_language(user_id)
+        t = translations[lang]
 
-        if text == "Add Subcategory":
-            await message.answer(translations["English"]["enter_subcategory_name"], reply_markup=ReplyKeyboardRemove())
+        if text == t["add_subcategory"]:
+            await message.answer(t["enter_subcategory_name"], reply_markup=ReplyKeyboardRemove())
             await state.set_state(UserStates.waiting_for_subcategory_name)
             return
 
-        if text == "Delete Subcategory":
+        if text == t["delete_subcategory"]:
             category = user_selections[user_id]["category"]
             subcategory_path = user_selections[user_id]["subcategory_path"]
             current_path = "/".join(subcategory_path) if subcategory_path else ""
             subcategories = cat_db.get_subcategories(user_id, category, current_path)
 
             if not subcategories:
-                await message.answer(translations["English"]["no_subcategories"])
+                await message.answer(t["no_subcategories"])
                 return
 
             await message.answer(
-                translations["English"]["select_subcategory_to_delete"],
-                reply_markup=kb.get_delete_subcategories_keyboard(user_id, category, current_path)
+                t["select_subcategory_to_delete"],
+                reply_markup=kb.get_delete_subcategories_keyboard(user_id, category, current_path, language=lang)
             )
             await state.set_state(UserStates.deleting_subcategory)
             return
 
-        if text == "Back to Menu":
+        if text == t["back"]:
             subcategory_path = user_selections[user_id]["subcategory_path"]
             if not subcategory_path:
                 await message.answer(
-                    translations["English"]["welcome"],
+                    t["welcome"],
                     reply_markup=kb.get_categories_keyboard()
                 )
                 await state.set_state(UserStates.selecting_category)
@@ -142,17 +159,17 @@ async def handle_text(message: Message, state: FSMContext):
 
                 buttons = [
                     [
-                        InlineKeyboardButton(text="View Files", callback_data=FileAction(action="view", category=category, subcategory=new_path).pack()),
-                        InlineKeyboardButton(text="Delete Files", callback_data=FileAction(action="delete_menu", category=category, subcategory=new_path).pack())
+                        InlineKeyboardButton(text=t["view_files"], callback_data=FileAction(action="view", category=category, subcategory=new_path).pack()),
+                        InlineKeyboardButton(text=t["delete_files"], callback_data=FileAction(action="delete_menu", category=category, subcategory=new_path).pack())
                     ]
                 ]
                 markup = InlineKeyboardMarkup(inline_keyboard=buttons)
 
                 await message.answer(
-                    "Send files or manage subcategories",
-                    reply_markup=kb.get_subcategories_keyboard(user_id, category, new_path)
+                    t["select_subcategory"],
+                    reply_markup=kb.get_subcategories_keyboard(user_id, category, new_path, language=lang)
                 )
-                await message.answer("File actions:", reply_markup=markup)
+                await message.answer(t["file_actions"], reply_markup=markup)
             return
 
         category = user_selections[user_id]["category"]
@@ -165,21 +182,21 @@ async def handle_text(message: Message, state: FSMContext):
 
             buttons = [
                 [
-                    InlineKeyboardButton(text="View Files", callback_data=FileAction(action="view", category=category, subcategory=new_path).pack()),
-                    InlineKeyboardButton(text="Delete Files", callback_data=FileAction(action="delete_menu", category=category, subcategory=new_path).pack())
+                    InlineKeyboardButton(text=t["view_files"], callback_data=FileAction(action="view", category=category, subcategory=new_path).pack()),
+                    InlineKeyboardButton(text=t["delete_files"], callback_data=FileAction(action="delete_menu", category=category, subcategory=new_path).pack())
                 ]
             ]
             markup = InlineKeyboardMarkup(inline_keyboard=buttons)
 
             await message.answer(
-                "Send files or manage subcategories",
-                reply_markup=kb.get_subcategories_keyboard(user_id, category, new_path)
+                t["select_subcategory"],
+                reply_markup=kb.get_subcategories_keyboard(user_id, category, new_path, language=lang)
             )
-            await message.answer("File actions:", reply_markup=markup)
+            await message.answer(t["file_actions"], reply_markup=markup)
             return
 
         if user_id not in user_selections:
-            await message.answer("Please start over with /start")
+            await message.answer(t["start_over"])
             return
 
         category = user_selections[user_id]["category"]
@@ -199,47 +216,48 @@ async def handle_text(message: Message, state: FSMContext):
         with open(file_path, 'a', encoding='utf-8') as f:
             f.write(text + "\n")
 
-        await message.answer("Text saved successfully!")
+        await message.answer(t["text_saved"])
     except Exception as e:
         log_error_to_db(message.from_user.id, message.from_user.username or "N/A",
                         message.from_user.first_name or "N/A", message.from_user.last_name or "N/A",
                         "handle_text", str(e))
         await message.answer("Function is currently unavailable. Please try again later.")
 
-
 @user_router.message(UserStates.waiting_for_file, F.text)
 async def handle_file_text_commands(message: Message, state: FSMContext):
     try:
         user_id = message.from_user.id
         text = message.text
+        lang = db.get_language(user_id)
+        t = translations[lang]
 
-        if text == "Add Subcategory":
-            await message.answer(translations["English"]["enter_subcategory_name"], reply_markup=ReplyKeyboardRemove())
+        if text == t["add_subcategory"]:
+            await message.answer(t["enter_subcategory_name"], reply_markup=ReplyKeyboardRemove())
             await state.set_state(UserStates.waiting_for_subcategory_name)
             return
 
-        if text == "Delete Subcategory":
+        if text == t["delete_subcategory"]:
             category = user_selections[user_id]["category"]
             subcategory_path = user_selections[user_id]["subcategory_path"]
             current_path = "/".join(subcategory_path) if subcategory_path else ""
             subcategories = cat_db.get_subcategories(user_id, category, current_path)
 
             if not subcategories:
-                await message.answer(translations["English"]["no_subcategories"])
+                await message.answer(t["no_subcategories"])
                 return
 
             await message.answer(
-                translations["English"]["select_subcategory_to_delete"],
-                reply_markup=kb.get_delete_subcategories_keyboard(user_id, category, current_path)
+                t["select_subcategory_to_delete"],
+                reply_markup=kb.get_delete_subcategories_keyboard(user_id, category, current_path, language=lang)
             )
             await state.set_state(UserStates.deleting_subcategory)
             return
 
-        if text == "Back to Menu":
+        if text == t["back"]:
             subcategory_path = user_selections[user_id]["subcategory_path"]
             if not subcategory_path:
                 await message.answer(
-                    translations["English"]["welcome"],
+                    t["welcome"],
                     reply_markup=kb.get_categories_keyboard()
                 )
                 await state.set_state(UserStates.selecting_category)
@@ -250,17 +268,17 @@ async def handle_file_text_commands(message: Message, state: FSMContext):
 
                 buttons = [
                     [
-                        InlineKeyboardButton(text="View Files", callback_data=FileAction(action="view", category=category, subcategory=new_path).pack()),
-                        InlineKeyboardButton(text="Delete Files", callback_data=FileAction(action="delete_menu", category=category, subcategory=new_path).pack())
+                        InlineKeyboardButton(text=t["view_files"], callback_data=FileAction(action="view", category=category, subcategory=new_path).pack()),
+                        InlineKeyboardButton(text=t["delete_files"], callback_data=FileAction(action="delete_menu", category=category, subcategory=new_path).pack())
                     ]
                 ]
                 markup = InlineKeyboardMarkup(inline_keyboard=buttons)
 
                 await message.answer(
-                    "Send files or manage subcategories",
-                    reply_markup=kb.get_subcategories_keyboard(user_id, category, new_path)
+                    t["select_subcategory"],
+                    reply_markup=kb.get_subcategories_keyboard(user_id, category, new_path, language=lang)
                 )
-                await message.answer("File actions:", reply_markup=markup)
+                await message.answer(t["file_actions"], reply_markup=markup)
             return
 
         category = user_selections[user_id]["category"]
@@ -273,31 +291,32 @@ async def handle_file_text_commands(message: Message, state: FSMContext):
 
             buttons = [
                 [
-                    InlineKeyboardButton(text="View Files", callback_data=FileAction(action="view", category=category, subcategory=new_path).pack()),
-                    InlineKeyboardButton(text="Delete Files", callback_data=FileAction(action="delete_menu", category=category, subcategory=new_path).pack())
+                    InlineKeyboardButton(text=t["view_files"], callback_data=FileAction(action="view", category=category, subcategory=new_path).pack()),
+                    InlineKeyboardButton(text=t["delete_files"], callback_data=FileAction(action="delete_menu", category=category, subcategory=new_path).pack())
                 ]
             ]
             markup = InlineKeyboardMarkup(inline_keyboard=buttons)
 
             await message.answer(
-                "Send files or manage subcategories",
-                reply_markup=kb.get_subcategories_keyboard(user_id, category, new_path)
+                t["select_subcategory"],
+                reply_markup=kb.get_subcategories_keyboard(user_id, category, new_path, language=lang)
             )
-            await message.answer("File actions:", reply_markup=markup)
+            await message.answer(t["file_actions"], reply_markup=markup)
     except Exception as e:
         log_error_to_db(message.from_user.id, message.from_user.username or "N/A",
                         message.from_user.first_name or "N/A", message.from_user.last_name or "N/A",
                         "handle_file_text", str(e))
-
 
 @user_router.message(UserStates.waiting_for_subcategory_name)
 async def add_subcategory_finish(message: Message, state: FSMContext):
     try:
         user_id = message.from_user.id
         subcategory_name = message.text.strip()
+        lang = db.get_language(user_id)
+        t = translations[lang]
 
         if user_id not in user_selections:
-            await message.answer("Please start over with /start")
+            await message.answer(t["start_over"])
             return
 
         category = user_selections[user_id]["category"]
@@ -307,21 +326,21 @@ async def add_subcategory_finish(message: Message, state: FSMContext):
         if cat_db.add_subcategory(user_id, category, subcategory_name, parent_path):
             buttons = [
                 [
-                    InlineKeyboardButton(text="View Files", callback_data=FileAction(action="view", category=category, subcategory=parent_path).pack()),
-                    InlineKeyboardButton(text="Delete Files", callback_data=FileAction(action="delete_menu", category=category, subcategory=parent_path).pack())
+                    InlineKeyboardButton(text=t["view_files"], callback_data=FileAction(action="view", category=category, subcategory=parent_path).pack()),
+                    InlineKeyboardButton(text=t["delete_files"], callback_data=FileAction(action="delete_menu", category=category, subcategory=parent_path).pack())
                 ]
             ]
             markup = InlineKeyboardMarkup(inline_keyboard=buttons)
 
             await message.answer(
-                translations["English"]["subcategory_added"].format(subcategory_name),
-                reply_markup=kb.get_subcategories_keyboard(user_id, category, parent_path)
+                t["subcategory_added"].format(subcategory_name),
+                reply_markup=kb.get_subcategories_keyboard(user_id, category, parent_path, language=lang)
             )
-            await message.answer("File actions:", reply_markup=markup)
+            await message.answer(t["file_actions"], reply_markup=markup)
         else:
             await message.answer(
-                "Subcategory already exists!",
-                reply_markup=kb.get_subcategories_keyboard(user_id, category, parent_path)
+                t["subcategory_exists"],
+                reply_markup=kb.get_subcategories_keyboard(user_id, category, parent_path, language=lang)
             )
 
         if category in ["Passwords", "Contacts"]:
@@ -334,24 +353,25 @@ async def add_subcategory_finish(message: Message, state: FSMContext):
                         "add_subcategory", str(e))
         await message.answer("Function is currently unavailable. Please try again later.")
 
-
 @user_router.message(UserStates.deleting_subcategory)
 async def delete_subcategory_confirm(message: Message, state: FSMContext):
     try:
         user_id = message.from_user.id
         subcategory = message.text
+        lang = db.get_language(user_id)
+        t = translations[lang]
 
         if user_id not in user_selections:
-            await message.answer("Please start over with /start")
+            await message.answer(t["start_over"])
             return
 
         category = user_selections[user_id]["category"]
         current_path = ""
 
-        if subcategory == "Back to Menu":
+        if subcategory == t["back"]:
             await message.answer(
-                "Send files or manage subcategories",
-                reply_markup=kb.get_subcategories_keyboard(user_id, category, current_path)
+                t["select_subcategory"],
+                reply_markup=kb.get_subcategories_keyboard(user_id, category, current_path, language=lang)
             )
             if category in ["Passwords", "Contacts"]:
                 await state.set_state(UserStates.waiting_for_text)
@@ -368,8 +388,8 @@ async def delete_subcategory_confirm(message: Message, state: FSMContext):
             shutil.rmtree(full_path)
 
         await message.answer(
-            translations["English"]["subcategory_deleted"].format(subcategory),
-            reply_markup=kb.get_subcategories_keyboard(user_id, category, current_path)
+            t["subcategory_deleted"].format(subcategory),
+            reply_markup=kb.get_subcategories_keyboard(user_id, category, current_path, language=lang)
         )
         if category in ["Passwords", "Contacts"]:
             await state.set_state(UserStates.waiting_for_text)
@@ -381,14 +401,15 @@ async def delete_subcategory_confirm(message: Message, state: FSMContext):
                         "delete_subcategory", str(e))
         await message.answer("Function is currently unavailable. Please try again later.")
 
-
 @user_router.message(UserStates.waiting_for_file, F.document | F.photo | F.video | F.audio)
 async def handle_file(message: Message, state: FSMContext):
     try:
         user_id = message.from_user.id
+        lang = db.get_language(user_id)
+        t = translations[lang]
 
         if user_id not in user_selections:
-            await message.answer("Please start over with /start")
+            await message.answer(t["start_over"])
             return
 
         category = user_selections[user_id]["category"]
@@ -420,7 +441,7 @@ async def handle_file(message: Message, state: FSMContext):
         allowed_extensions = main_categories[category]["extensions"]
 
         if file_ext not in allowed_extensions:
-            await message.answer(f"Invalid file type. Allowed: {', '.join(allowed_extensions)}")
+            await message.answer(t["invalid_file_type"].format(', '.join(allowed_extensions)))
             return
 
         category_path = main_categories[category]["path"]
@@ -437,18 +458,19 @@ async def handle_file(message: Message, state: FSMContext):
         file_obj = await message.bot.get_file(file_id)
         await message.bot.download_file(file_obj.file_path, file_path)
 
-        await message.answer(f"File saved: {file_name}")
+        await message.answer(t["file_saved_msg"].format(file_name))
     except Exception as e:
         log_error_to_db(message.from_user.id, message.from_user.username or "N/A",
                         message.from_user.first_name or "N/A", message.from_user.last_name or "N/A",
                         "handle_file", str(e))
         await message.answer("Function is currently unavailable. Please try again later.")
 
-
 @user_router.callback_query(FileAction.filter(F.action == "view"))
 async def view_files(callback: CallbackQuery, callback_data: FileAction):
     try:
         user_id = callback.from_user.id
+        lang = db.get_language(user_id)
+        t = translations[lang]
         category = callback_data.category
         subcategory = callback_data.subcategory
 
@@ -458,14 +480,14 @@ async def view_files(callback: CallbackQuery, callback_data: FileAction):
             full_path = os.path.join(full_path, subcategory)
 
         if not os.path.exists(full_path):
-            await callback.message.answer("No files found!")
+            await callback.message.answer(t["no_files"])
             await callback.answer()
             return
 
         files = [f for f in os.listdir(full_path) if os.path.isfile(os.path.join(full_path, f))]
 
         if not files:
-            await callback.message.answer("No files found!")
+            await callback.message.answer(t["no_files"])
             await callback.answer()
             return
 
@@ -491,11 +513,12 @@ async def view_files(callback: CallbackQuery, callback_data: FileAction):
         await callback.message.answer("Function is currently unavailable. Please try again later.")
         await callback.answer()
 
-
 @user_router.callback_query(FileAction.filter(F.action == "delete_menu"))
 async def delete_files_menu(callback: CallbackQuery, callback_data: FileAction):
     try:
         user_id = callback.from_user.id
+        lang = db.get_language(user_id)
+        t = translations[lang]
         category = callback_data.category
         subcategory = callback_data.subcategory
 
@@ -505,14 +528,14 @@ async def delete_files_menu(callback: CallbackQuery, callback_data: FileAction):
             full_path = os.path.join(full_path, subcategory)
 
         if not os.path.exists(full_path):
-            await callback.message.answer("No files found!")
+            await callback.message.answer(t["no_files"])
             await callback.answer()
             return
 
         files = [f for f in os.listdir(full_path) if os.path.isfile(os.path.join(full_path, f))]
 
         if not files:
-            await callback.message.answer("No files found!")
+            await callback.message.answer(t["no_files"])
             await callback.answer()
             return
 
@@ -527,10 +550,10 @@ async def delete_files_menu(callback: CallbackQuery, callback_data: FileAction):
         if row:
             buttons.append(row)
 
-        buttons.append([InlineKeyboardButton(text="Delete All", callback_data=FileAction(action="delete_all", category=category, subcategory=subcategory).pack())])
+        buttons.append([InlineKeyboardButton(text=t["delete_all"], callback_data=FileAction(action="delete_all", category=category, subcategory=subcategory).pack())])
 
         markup = InlineKeyboardMarkup(inline_keyboard=buttons)
-        await callback.message.answer("Select a file to delete or delete all:", reply_markup=markup)
+        await callback.message.answer(t["select_file_delete"], reply_markup=markup)
         await callback.answer()
     except Exception as e:
         log_error_to_db(callback.from_user.id, callback.from_user.username or "N/A",
@@ -539,11 +562,12 @@ async def delete_files_menu(callback: CallbackQuery, callback_data: FileAction):
         await callback.message.answer("Function is currently unavailable. Please try again later.")
         await callback.answer()
 
-
 @user_router.callback_query(FileAction.filter(F.action == "delete_file"))
 async def delete_file(callback: CallbackQuery, callback_data: FileAction):
     try:
         user_id = callback.from_user.id
+        lang = db.get_language(user_id)
+        t = translations[lang]
         category = callback_data.category
         subcategory = callback_data.subcategory
         filename = callback_data.filename
@@ -557,13 +581,13 @@ async def delete_file(callback: CallbackQuery, callback_data: FileAction):
 
         if os.path.exists(file_path):
             os.remove(file_path)
-            await callback.message.answer(f"Deleted: {filename}")
+            await callback.message.answer(t["deleted_msg"].format(filename))
             try:
                 await callback.message.delete()
             except:
                 pass
         else:
-            await callback.message.answer("File not found!")
+            await callback.message.answer(t["no_files"])
 
         await callback.answer()
     except Exception as e:
@@ -573,11 +597,12 @@ async def delete_file(callback: CallbackQuery, callback_data: FileAction):
         await callback.message.answer("Function is currently unavailable. Please try again later.")
         await callback.answer()
 
-
 @user_router.callback_query(FileAction.filter(F.action == "delete_all"))
 async def delete_all_files(callback: CallbackQuery, callback_data: FileAction):
     try:
         user_id = callback.from_user.id
+        lang = db.get_language(user_id)
+        t = translations[lang]
         category = callback_data.category
         subcategory = callback_data.subcategory
 
@@ -587,7 +612,7 @@ async def delete_all_files(callback: CallbackQuery, callback_data: FileAction):
             full_path = os.path.join(full_path, subcategory)
 
         if not os.path.exists(full_path):
-            await callback.message.answer("No files found!")
+            await callback.message.answer(t["no_files"])
             await callback.answer()
             return
 
@@ -602,7 +627,7 @@ async def delete_all_files(callback: CallbackQuery, callback_data: FileAction):
             except:
                 pass
 
-        await callback.message.answer(f"Deleted {deleted_count} files")
+        await callback.message.answer(t["deleted_count"].format(deleted_count))
         try:
             await callback.message.delete()
         except:
