@@ -7,29 +7,26 @@ if getattr(sys, 'frozen', False):
     BASE_DIR = os.path.dirname(sys.executable)
 else:
     # If running normally, BASE_DIR is the project root
-    # We assume config.py is in app/common/, so we go up 2 levels
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Load .env from the BASE_DIR
 env_path = os.path.join(BASE_DIR, ".env")
 load_dotenv(env_path)
 
-APP_DIR = os.path.join(BASE_DIR, "app")
-DB_DIR = os.path.join(BASE_DIR, "databases")
-
 # Version control: 'personal' or 'commercial'
 VERSION = os.getenv("VERSION", "personal")
 
 if VERSION == "personal":
     USER_FILES_DIR = os.path.join(BASE_DIR, "files")
+    # For personal version, we put bot.db directly in root
+    SQLITE_DB_PATH = os.path.join(BASE_DIR, "bot.db")
 else:
     USER_FILES_DIR = os.path.join(BASE_DIR, "user_files")
+    # Commercial version might keep the old structure for backward compatibility or organization
+    SQLITE_DB_PATH = os.path.join(BASE_DIR, "app", "databases", "bot.db")
 
-# Single database file for personal version
-SQLITE_DB_PATH = os.path.join(DB_DIR, "bot.db")
 DATABASE_TYPE = os.getenv("DATABASE_TYPE", "sqlite")
 
-os.makedirs(DB_DIR, exist_ok=True)
 os.makedirs(USER_FILES_DIR, exist_ok=True)
 
 icons = {
@@ -41,17 +38,6 @@ icons = {
     "Archives": "📦",
     "Passwords": "🔑",
     "Contacts": "👥"
-}
-
-category_map = {
-    "Photos": "photos",
-    "Videos": "videos",
-    "Programing": "programing",
-    "Documents": "documents",
-    "Music": "music",
-    "Archives": "archives",
-    "Passwords": "passwords",
-    "Contacts": "contacts"
 }
 
 translations = {
