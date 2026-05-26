@@ -2,22 +2,22 @@ import os
 import sys
 from dotenv import load_dotenv
 
-# Find the directory of the executable or script
 if getattr(sys, 'frozen', False):
-    # If compiled with PyInstaller, use the directory of the EXE
     BASE_DIR = os.path.dirname(os.path.realpath(sys.executable))
 else:
-    # If running as script, go up from app/common/
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
-# Force load .env from the same folder as EXE
 env_path = os.path.join(BASE_DIR, ".env")
-load_dotenv(env_path, override=True)
+if os.path.exists(env_path):
+    load_dotenv(env_path, override=True)
 
 VERSION = os.getenv("VERSION", "personal")
 DATABASE_TYPE = os.getenv("DATABASE_TYPE", "sqlite")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+# Primary token
 PAYMENT_TOKEN = os.getenv("PAYMENT_TOKEN")
+# Secondary token (backup or alternative)
+PAYMENT_TOKEN_2 = os.getenv("PAYMENT_TOKEN_2")
 
 if VERSION == "personal":
     USER_FILES_DIR = os.path.join(BASE_DIR, "files")
