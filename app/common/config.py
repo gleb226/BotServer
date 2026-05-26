@@ -17,11 +17,10 @@ PAYMENT_TOKEN = os.getenv("PAYMENT_TOKEN")
 PAYMENT_TOKEN_2 = os.getenv("PAYMENT_TOKEN_2")
 MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017")
 
-# Automatic Database Selection
 if VERSION == "commercial":
     DATABASE_TYPE = "mongodb"
     USER_FILES_DIR = os.path.join(BASE_DIR, "user_files")
-    SQLITE_DB_PATH = None # Not used
+    SQLITE_DB_PATH = None
 else:
     DATABASE_TYPE = "sqlite"
     USER_FILES_DIR = os.path.join(BASE_DIR, "files")
@@ -136,7 +135,7 @@ translations = {
 }
 
 main_categories = {
-    "Photos": {"path": "photos", "extensions": ["jpg", "jpeg", "png", "gif", "bmp", "tiff"]},
+    "Photos": {"path": "photos", "extensions": ["jpg", "jpeg", "png", "gif", "bmp", "tiff", "heic"]},
     "Videos": {"path": "videos", "extensions": ["mp4", "mkv", "avi", "mov", "wmv", "flv"]},
     "Programing": {"path": "programing", "extensions": ["py", "java", "js", "html", "css", "sql", "json", "xml", "db", "c", "cpp", "cs", "go", "rs", "h", "php", "txt", "md"]},
     "Documents": {"path": "documents", "extensions": ["pdf", "docx", "txt", "xlsx", "pptx"]},

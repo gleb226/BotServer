@@ -4,3 +4,5 @@ tabulate
 motor
 pymongo
 pyinstaller
+customtkinter
+pillow
