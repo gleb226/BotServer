@@ -6,22 +6,68 @@
 [![MongoDB](https://img.shields.io/badge/database-MongoDB-green.svg)](https://www.mongodb.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**BotServer** is an advanced, open-source Telegram bot for seamless file storage, organization, and management. It supports a structured hierarchy of subdirectories, multiple categories, and works with both **SQLite** (for simple local setups) and **MongoDB** (for advanced scalable environments).
+**BotServer** is an advanced, open-source Telegram bot for seamless file storage, organization, and management. It supports a structured hierarchy of subdirectories, multiple categories, and works with both **SQLite** (for simple local setups) and **MongoDB** (for scalable environments).
 
 ---
 
-## ⚡ One-Line Installation
+## ⚡ One-Line Quick Installation
 
-**Linux / Mac:**
+### **For Linux / macOS:**
 ```bash
 git clone https://github.com/gleb226/BotServer.git && cd BotServer && chmod +x install.sh && ./install.sh
 ```
 
-**Windows:**
+### **For Windows (PowerShell):**
+```powershell
+git clone https://github.com/gleb226/BotServer.git; cd BotServer; .\install.bat
+```
+
+### **For Windows (CMD):**
 ```cmd
 git clone https://github.com/gleb226/BotServer.git && cd BotServer && install.bat
 ```
-*The installer will automatically ask for your Bot Token and Database preference.*
+
+> 💡 *The interactive installer will automatically prompt you for your Bot Token and Database preference.*
+
+---
+
+## 🛠️ Detailed Manual Installation
+
+If you prefer to set up the project step-by-step:
+
+### 1. Clone the Repository
+```bash
+git clone https://github.com/gleb226/BotServer.git
+cd BotServer
+```
+
+### 2. Set Up Virtual Environment
+```bash
+python -m venv .venv
+# Activate on Windows:
+.venv\Scripts\activate
+# Activate on Linux/macOS:
+source .venv/bin/activate
+```
+
+### 3. Install Dependencies
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Configuration
+Create a `.env` file in the root directory:
+```env
+BOT_TOKEN=your_telegram_bot_token
+DATABASE_TYPE=sqlite  # or 'mongodb'
+# If using mongodb, add:
+# MONGO_URL=mongodb://localhost:27017
+```
+
+### 5. Launch
+```bash
+python bot.py
+```
 
 ---
 
@@ -31,17 +77,8 @@ git clone https://github.com/gleb226/BotServer.git && cd BotServer && install.ba
 - 📂 **Dynamic Folder Structure**: Create and navigate through unlimited nested subdirectories.
 - 🌐 **Multi-language Support**: Full English and Ukrainian localization (switch via `/language`).
 - 🔐 **Isolated User Storage**: Secure, private workspace for every user.
-- 💾 **Hybrid Database Engine**: Choose between SQLite (default) or MongoDB during setup.
-- 📝 **Interactive Setup**: No manual `.env` editing required – the script handles everything.
-
----
-
-## 🛠️ Technology Stack
-
-- **Framework**: [aiogram 3.x](https://docs.aiogram.dev/)
-- **Database**: SQLite (Default) or MongoDB (Advanced)
-- **Language**: Python 3.8+
-- **Environment**: Automated `.env` generation
+- 💾 **Hybrid Database Engine**: Choose between SQLite (default, zero-config) or MongoDB.
+- 📝 **Interactive Setup**: No manual `.env` editing required with our quick installers.
 
 ---
 
