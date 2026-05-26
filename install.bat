@@ -24,7 +24,7 @@ echo [2/4] Installing dependencies...
 python -m pip install --upgrade pip --quiet
 pip install -r requirements.txt --quiet --no-cache-dir
 
-:: 4. Get Token (Personal by default)
+:: 4. Get Token
 echo.
 echo --- CONFIGURATION ---
 echo To get your BOT_TOKEN, message @BotFather on Telegram.
@@ -41,7 +41,16 @@ echo BOT_TOKEN=!bot_token!
 echo.
 echo [3/4] Building standalone executable...
 echo This will take about 60 seconds. Please wait...
-pyinstaller --onefile --name BotLauncher --noconsole --distpath . bot.py >nul 2>&1
+:: Added hidden imports to fix common PyInstaller issues with aiogram and other libs
+pyinstaller --onefile --name BotLauncher --noconsole --distpath . ^
+--hidden-import aiogram ^
+--hidden-import aiogram.dispatcher ^
+--hidden-import aiogram.filters ^
+--hidden-import aiogram.fsm.storage.memory ^
+--hidden-import motor ^
+--hidden-import pymongo ^
+--hidden-import tabulate ^
+bot.py >nul 2>&1
 
 :: 6. Finalizing
 echo [4/4] Finalizing setup...
@@ -65,7 +74,6 @@ echo.
 set /p launch="[INPUT] Launch the bot now? (y/n): "
 
 :: 7. Detached Cleanup (PowerShell)
-:: This will keep only the 4 essential items + the .env we just created
 set "cleanup_cmd=Start-Sleep -s 3; Get-ChildItem -Exclude 'BotLauncher.exe','.env','bot.db','files' | Remove-Item -Recurse -Force"
 
 if /i "!launch!"=="y" (
