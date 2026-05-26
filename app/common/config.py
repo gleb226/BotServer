@@ -2,27 +2,26 @@ import os
 import sys
 from dotenv import load_dotenv
 
-# Find the directory of the executable or script
+# Absolute path to the directory containing the executable or script
 if getattr(sys, 'frozen', False):
-    BASE_DIR = os.path.dirname(sys.executable)
+    BASE_DIR = os.path.dirname(os.path.realpath(sys.executable))
 else:
-    # If running normally, BASE_DIR is the project root
-    BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    # Go up from app/common/config.py to root
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
-# Load .env from the BASE_DIR
+# Ensure .env is loaded before anything else
 env_path = os.path.join(BASE_DIR, ".env")
-load_dotenv(env_path)
+if os.path.exists(env_path):
+    load_dotenv(env_path, override=True)
 
 # Version control: 'personal' or 'commercial'
 VERSION = os.getenv("VERSION", "personal")
 
 if VERSION == "personal":
     USER_FILES_DIR = os.path.join(BASE_DIR, "files")
-    # For personal version, we put bot.db directly in root
     SQLITE_DB_PATH = os.path.join(BASE_DIR, "bot.db")
 else:
     USER_FILES_DIR = os.path.join(BASE_DIR, "user_files")
-    # Commercial version might keep the old structure for backward compatibility or organization
     SQLITE_DB_PATH = os.path.join(BASE_DIR, "app", "databases", "bot.db")
 
 DATABASE_TYPE = os.getenv("DATABASE_TYPE", "sqlite")
