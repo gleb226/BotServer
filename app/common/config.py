@@ -12,18 +12,19 @@ if os.path.exists(env_path):
     load_dotenv(env_path, override=True)
 
 VERSION = os.getenv("VERSION", "personal")
-DATABASE_TYPE = os.getenv("DATABASE_TYPE", "sqlite")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-# Primary token
 PAYMENT_TOKEN = os.getenv("PAYMENT_TOKEN")
-# Secondary token (backup or alternative)
 PAYMENT_TOKEN_2 = os.getenv("PAYMENT_TOKEN_2")
+MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017")
 
-if VERSION == "personal":
-    USER_FILES_DIR = os.path.join(BASE_DIR, "files")
-    SQLITE_DB_PATH = os.path.join(BASE_DIR, "bot.db")
-else:
+# Automatic Database Selection
+if VERSION == "commercial":
+    DATABASE_TYPE = "mongodb"
     USER_FILES_DIR = os.path.join(BASE_DIR, "user_files")
+    SQLITE_DB_PATH = None # Not used
+else:
+    DATABASE_TYPE = "sqlite"
+    USER_FILES_DIR = os.path.join(BASE_DIR, "files")
     SQLITE_DB_PATH = os.path.join(BASE_DIR, "bot.db")
 
 os.makedirs(USER_FILES_DIR, exist_ok=True)
