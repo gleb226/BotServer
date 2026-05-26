@@ -4,36 +4,30 @@ echo "==========================================="
 echo "   BotServer Installation Wizard"
 echo "==========================================="
 
-# Check for python
 if ! command -v python3 &> /dev/null
 then
     echo "Error: python3 could not be found. Please install Python 3."
     exit 1
 fi
 
-# Create virtual environment
 echo "Creating virtual environment..."
 python3 -m venv .venv
 source .venv/bin/activate
 
-# Install dependencies
 echo "Installing dependencies..."
 pip install -r requirements.txt
 
-# Interactive Configuration
 echo ""
 echo "--- Configuration ---"
 read -p "Enter your Telegram Bot Token: " bot_token
 
-echo "Choose Database Type:"
-echo "1) SQLite (Default, Simple)"
-echo "2) MongoDB (Advanced)"
-read -p "Selection [1-2]: " db_choice
+echo ""
+read -p "Use MongoDB instead of SQLite? (y/N): " use_mongo
 
 db_type="sqlite"
 mongo_url=""
 
-if [ "$db_choice" == "2" ]; then
+if [[ "$use_mongo" =~ ^[Yy]$ ]]; then
     db_type="mongodb"
     read -p "Enter MongoDB URL [mongodb://localhost:27017]: " mongo_url
     if [ -z "$mongo_url" ]; then
@@ -41,7 +35,6 @@ if [ "$db_choice" == "2" ]; then
     fi
 fi
 
-# Create .env file
 echo "DATABASE_TYPE=$db_type" > .env
 echo "BOT_TOKEN=$bot_token" >> .env
 if [ "$db_type" == "mongodb" ]; then

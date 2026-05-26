@@ -1,12 +1,12 @@
 import sqlite3
 from datetime import datetime
 from tabulate import tabulate
-from app.common.config import DATABASE_TYPE, USERS_DB_PATH
+from app.common.config import DATABASE_TYPE, SQLITE_DB_PATH
 
 class user_database:
     def __init__(self):
         if DATABASE_TYPE == "sqlite":
-            self.conn = sqlite3.connect(USERS_DB_PATH)
+            self.conn = sqlite3.connect(SQLITE_DB_PATH)
             self.cursor = self.conn.cursor()
             self.cursor.execute('''
                 CREATE TABLE IF NOT EXISTS users (
@@ -29,7 +29,6 @@ class user_database:
 
     def add_user(self, user_id: int, first_name: str, last_name: str, username: str,
                  language_code: str, is_premium: bool, chat_id: int, chat_type: str):
-        
         if DATABASE_TYPE == "sqlite":
             self.cursor.execute("SELECT user_id FROM users WHERE user_id = ?", (user_id,))
             if self.cursor.fetchone():

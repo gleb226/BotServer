@@ -11,9 +11,7 @@ DB_DIR = os.path.join(APP_DIR, "databases")
 
 USER_FILES_DIR = os.path.join(BASE_DIR, "user_files")
 
-USERS_DB_PATH = os.path.join(DB_DIR, "users.db")
-ERRORS_DB_PATH = os.path.join(DB_DIR, "errors.db")
-CATEGORIES_DB_PATH = os.path.join(DB_DIR, "categories.db")
+SQLITE_DB_PATH = os.path.join(DB_DIR, "bot.db")
 
 DATABASE_TYPE = os.getenv("DATABASE_TYPE", "sqlite")
 

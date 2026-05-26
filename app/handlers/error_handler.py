@@ -1,12 +1,12 @@
 import sqlite3
 from datetime import datetime
 from functools import wraps
-from app.common.config import DATABASE_TYPE, ERRORS_DB_PATH
+from app.common.config import DATABASE_TYPE, SQLITE_DB_PATH
 
 def log_error_to_db(user_id: int, username: str, firstname: str, lastname: str, command: str, error_message: str):
     if DATABASE_TYPE == "sqlite":
         try:
-            conn = sqlite3.connect(ERRORS_DB_PATH)
+            conn = sqlite3.connect(SQLITE_DB_PATH)
             cursor = conn.cursor()
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS errors (

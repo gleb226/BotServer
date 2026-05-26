@@ -1,10 +1,10 @@
 import sqlite3
-from app.common.config import DATABASE_TYPE, CATEGORIES_DB_PATH
+from app.common.config import DATABASE_TYPE, SQLITE_DB_PATH
 
 class categories_database:
     def __init__(self):
         if DATABASE_TYPE == "sqlite":
-            self.conn = sqlite3.connect(CATEGORIES_DB_PATH)
+            self.conn = sqlite3.connect(SQLITE_DB_PATH)
             self.cursor = self.conn.cursor()
             self.cursor.execute('''
                 CREATE TABLE IF NOT EXISTS subcategories (
