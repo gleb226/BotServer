@@ -1,10 +1,14 @@
 import os
-from app.common.config import main_categories, USER_FILES_DIR
+from app.common.config import main_categories, USER_FILES_DIR, VERSION
 
 
 def get_folder_path(user_id, category, subcategory_path=None):
     category_path = main_categories[category]["path"]
-    full_path = os.path.join(USER_FILES_DIR, str(user_id), category_path)
+    
+    if VERSION == "personal":
+        full_path = os.path.join(USER_FILES_DIR, category_path)
+    else:
+        full_path = os.path.join(USER_FILES_DIR, str(user_id), category_path)
 
     if subcategory_path:
         if isinstance(subcategory_path, list):

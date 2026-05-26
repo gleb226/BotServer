@@ -1,8 +1,5 @@
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
-from app.common.config import main_categories, translations
-from app.databases.categories_database import categories_database
-
-cat_db = categories_database()
+from app.common.config import main_categories, translations, icons
 
 def get_language_keyboard():
     buttons = [
@@ -10,13 +7,14 @@ def get_language_keyboard():
     ]
     return ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
 
-def get_categories_keyboard():
+def get_categories_keyboard(language="English"):
     buttons = []
     row = []
     categories = list(main_categories.keys())
+    t = translations[language]["categories"]
 
-    for i, category in enumerate(categories):
-        row.append(KeyboardButton(text=category))
+    for category in categories:
+        row.append(KeyboardButton(text=t.get(category, category)))
         if len(row) == 2:
             buttons.append(row)
             row = []
@@ -27,13 +25,15 @@ def get_categories_keyboard():
     return ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
 
 def get_subcategories_keyboard(user_id, category, parent_subcategory=None, language="English"):
+    from app.databases.categories_database import categories_database
+    cat_db = categories_database()
     subcategories = cat_db.get_subcategories(user_id, category, parent_subcategory)
 
     buttons = []
     row = []
 
     for subcategory in subcategories:
-        row.append(KeyboardButton(text=subcategory))
+        row.append(KeyboardButton(text=f"📁 {subcategory}"))
         if len(row) == 2:
             buttons.append(row)
             row = []
@@ -48,6 +48,8 @@ def get_subcategories_keyboard(user_id, category, parent_subcategory=None, langu
     return ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
 
 def get_delete_subcategories_keyboard(user_id, category, parent_subcategory=None, language="English"):
+    from app.databases.categories_database import categories_database
+    cat_db = categories_database()
     subcategories = cat_db.get_subcategories(user_id, category, parent_subcategory)
 
     buttons = []
