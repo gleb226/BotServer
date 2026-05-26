@@ -19,34 +19,22 @@ if exist ".venv" rd /s /q .venv
 python -m venv .venv >nul 2>&1
 call .venv\Scripts\activate
 
-:: 3. Install Dependencies (Using --no-cache-dir to avoid warnings)
+:: 3. Install Dependencies
 echo [2/4] Installing dependencies...
 python -m pip install --upgrade pip --quiet
 pip install -r requirements.txt --quiet --no-cache-dir
 
-:: 4. Get Token and Version
+:: 4. Get Token (Personal by default)
 echo.
 echo --- CONFIGURATION ---
-set /p bot_token="[INPUT] Enter Telegram Bot Token: "
+echo To get your BOT_TOKEN, message @BotFather on Telegram.
 echo.
-echo Choose Version:
-echo 1) Personal (Standalone, Local Storage)
-echo 2) Commercial (Scalable, Payments, User Isolation)
-set /p v_choice="Selection [1-2]: "
-
-set version=personal
-set payment_token=
-
-if "!v_choice!"=="2" (
-    set version=commercial
-    set /p payment_token="[INPUT] Enter Payment Provider Token (LikPay): "
-)
+set /p bot_token="[INPUT] Enter Telegram Bot Token: "
 
 (
-echo VERSION=!version!
+echo VERSION=personal
 echo DATABASE_TYPE=sqlite
 echo BOT_TOKEN=!bot_token!
-if not "!payment_token!"=="" echo PAYMENT_TOKEN=!payment_token!
 ) > .env
 
 :: 5. Compile to EXE
@@ -55,7 +43,7 @@ echo [3/4] Building standalone executable...
 echo This will take about 60 seconds. Please wait...
 pyinstaller --onefile --name BotLauncher --noconsole --distpath . bot.py >nul 2>&1
 
-:: 6. Verify and Cleanup Preparation
+:: 6. Finalizing
 echo [4/4] Finalizing setup...
 if not exist "files" mkdir "files"
 
@@ -64,19 +52,20 @@ echo ===================================================
 echo           INSTALLATION SUCCESSFUL!
 echo ===================================================
 echo.
-echo  The following items are ready:
-echo  1. BotLauncher.exe (Double-click to start)
-echo  2. .env            (Your configuration)
-echo  3. bot.db          (Database)
-echo  4. /files          (Data storage)
+echo  Ready files:
+echo  1. BotLauncher.exe (The App)
+echo  2. .env            (Your Settings)
+echo  3. bot.db          (Your Data Index)
+echo  4. /files          (Storage Folder)
 echo.
-echo  Cleaning up source files...
+echo  All source code and temporary files will be removed.
 echo ===================================================
 echo.
 
 set /p launch="[INPUT] Launch the bot now? (y/n): "
 
 :: 7. Detached Cleanup (PowerShell)
+:: This will keep only the 4 essential items + the .env we just created
 set "cleanup_cmd=Start-Sleep -s 3; Get-ChildItem -Exclude 'BotLauncher.exe','.env','bot.db','files' | Remove-Item -Recurse -Force"
 
 if /i "!launch!"=="y" (
