@@ -1,33 +1,10 @@
-import sqlite3
 from datetime import datetime
 from functools import wraps
-from app.common.config import DATABASE_TYPE, SQLITE_DB_PATH
+from app.common.config import DATABASE_TYPE
 
 def log_error_to_db(user_id: int, username: str, firstname: str, lastname: str, command: str, error_message: str):
     if DATABASE_TYPE == "sqlite":
-        try:
-            conn = sqlite3.connect(SQLITE_DB_PATH)
-            cursor = conn.cursor()
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS errors (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER,
-                    username TEXT,
-                    firstname TEXT,
-                    lastname TEXT,
-                    command TEXT,
-                    error_message TEXT,
-                    timestamp TEXT
-                )
-            ''')
-            cursor.execute('''
-                INSERT INTO errors (user_id, username, firstname, lastname, command, error_message, timestamp)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (user_id, username, firstname, lastname, command, error_message, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-            conn.commit()
-            conn.close()
-        except:
-            pass
+        return
     else:
         from app.databases.mongodb_client import errors_collection
         error_data = {

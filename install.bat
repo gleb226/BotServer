@@ -23,22 +23,9 @@ echo.
 echo --- Configuration ---
 set /p bot_token="Enter your Telegram Bot Token: "
 
-echo.
-set /p use_mongo="Use MongoDB instead of SQLite? (y/N): "
-
-set db_type=sqlite
-set mongo_url=
-
-if /i "!use_mongo!"=="y" (
-    set db_type=mongodb
-    set /p mongo_url="Enter MongoDB URL [mongodb://localhost:27017]: "
-    if "!mongo_url!"=="" set mongo_url=mongodb://localhost:27017
-)
-
 (
-echo DATABASE_TYPE=!db_type!
+echo DATABASE_TYPE=sqlite
 echo BOT_TOKEN=!bot_token!
-if "!db_type!"=="mongodb" echo MONGO_URL=!mongo_url!
 ) > .env
 
 echo.
