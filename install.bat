@@ -5,6 +5,7 @@ echo ===================================================
 echo           BotServer Installation Wizard
 echo ===================================================
 
+:: Check for python
 where python >nul 2>nul
 if %errorlevel% neq 0 (
     echo [ERROR] Python not found! Please install it.
@@ -12,44 +13,30 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-echo [1/5] Creating environment...
+echo [1/4] Creating environment...
 python -m venv .venv
 call .venv\Scripts\activate
 
-echo [2/5] Installing core components...
+echo [2/4] Installing core components...
 pip install -r requirements.txt --quiet
 
 echo.
 echo --- CONFIGURATION ---
 set /p bot_token="[INPUT] Enter Telegram Bot Token: "
-echo DATABASE_TYPE=sqlite > .env
+echo VERSION=personal > .env
+echo DATABASE_TYPE=sqlite >> .env
 echo BOT_TOKEN=!bot_token! >> .env
-echo VERSION=personal >> .env
 
-echo [3/5] Bundling application (This may take a minute)...
 echo.
-:: Progress bar simulation
-echo [##########          ] 50%%
+echo [3/4] Bundling application (This may take a minute)...
+echo.
+:: Run PyInstaller and output to the current folder
 pyinstaller --onefile --name BotLauncher --noconsole --distpath . bot.py >nul 2>&1
-echo [####################] 100%%
-echo.
 
-echo [4/5] Finalizing standalone mode...
-:: Create 'files' directory
+echo [4/4] Finalizing standalone mode...
+:: Create necessary folders if they don't exist
 if not exist "files" mkdir "files"
-
-echo [5/5] Cleaning up source files...
-:: We move the EXE first to protect it
-move BotLauncher.exe ..\ >nul 2>&1
-cd ..
-:: Remove the project source directory completely
-:: WARNING: This removes the directory the script is in!
-:: We use a temporary script to do the dirty work
-echo @echo off > cleanup.bat
-echo timeout /t 2 /nobreak ^>nul >> cleanup.bat
-echo rd /s /q BotServer >> cleanup.bat
-echo del cleanup.bat >> cleanup.bat
-start /b cleanup.bat
+if not exist "app\databases" mkdir "app\databases"
 
 echo.
 echo ===================================================
@@ -58,8 +45,8 @@ echo ===================================================
 echo.
 echo  YOUR BOT IS READY: BotLauncher.exe
 echo  YOUR FILES:        /files
+echo  YOUR SETTINGS:     .env
 echo.
-echo  You can now move BotLauncher.exe anywhere!
 echo ===================================================
 echo.
 
@@ -67,4 +54,24 @@ set /p launch="[INPUT] Launch the bot now? (y/n): "
 if /i "!launch!"=="y" (
     start BotLauncher.exe
 )
+
+:: Self-cleanup script: deletes everything except the essentials
+echo @echo off > cleanup.bat
+echo timeout /t 2 /nobreak ^>nul >> cleanup.bat
+echo del bot.py >> cleanup.bat
+echo del requirements.txt >> cleanup.bat
+echo del install.sh >> cleanup.bat
+echo del BotLauncher.spec >> cleanup.bat
+echo rd /s /q .venv >> cleanup.bat
+echo rd /s /q build >> cleanup.bat
+echo rd /s /q app\common >> cleanup.bat
+echo rd /s /q app\handlers >> cleanup.bat
+echo rd /s /q app\keyboards >> cleanup.bat
+echo rd /s /q app\utils >> cleanup.bat
+echo :: Note: We keep app\databases for the bot.db >> cleanup.bat
+echo del cleanup.bat >> cleanup.bat
+echo exit >> cleanup.bat
+
+:: Launch cleanup in background and close this window
+start /b cleanup.bat
 exit

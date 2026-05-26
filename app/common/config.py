@@ -1,11 +1,21 @@
 import os
+import sys
 from dotenv import load_dotenv
 
-load_dotenv()
+# Find the directory of the executable or script
+if getattr(sys, 'frozen', False):
+    BASE_DIR = os.path.dirname(sys.executable)
+else:
+    # If running normally, BASE_DIR is the project root
+    # We assume config.py is in app/common/, so we go up 2 levels
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-BASE_DIR = os.getcwd()
+# Load .env from the BASE_DIR
+env_path = os.path.join(BASE_DIR, ".env")
+load_dotenv(env_path)
+
 APP_DIR = os.path.join(BASE_DIR, "app")
-DB_DIR = os.path.join(APP_DIR, "databases")
+DB_DIR = os.path.join(BASE_DIR, "databases")
 
 # Version control: 'personal' or 'commercial'
 VERSION = os.getenv("VERSION", "personal")
@@ -15,13 +25,13 @@ if VERSION == "personal":
 else:
     USER_FILES_DIR = os.path.join(BASE_DIR, "user_files")
 
+# Single database file for personal version
 SQLITE_DB_PATH = os.path.join(DB_DIR, "bot.db")
 DATABASE_TYPE = os.getenv("DATABASE_TYPE", "sqlite")
 
 os.makedirs(DB_DIR, exist_ok=True)
 os.makedirs(USER_FILES_DIR, exist_ok=True)
 
-# Icons for categories
 icons = {
     "Photos": "🖼️",
     "Videos": "🎬",
