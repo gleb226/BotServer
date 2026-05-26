@@ -25,8 +25,18 @@ echo "DATABASE_TYPE=sqlite" > .env
 echo "BOT_TOKEN=$bot_token" >> .env
 
 echo ""
+echo "Creating standalone executable..."
+pyinstaller --onefile --name BotLauncher bot.py
+
+echo ""
 echo "==========================================="
 echo "   Installation Complete!"
 echo "==========================================="
-echo "To start the bot, run: source .venv/bin/activate && python3 bot.py"
+echo "Executable created in: ./dist/BotLauncher"
 echo "==========================================="
+echo ""
+
+read -p "Would you like to start the bot now? (y/N): " start_bot
+if [[ "$start_bot" =~ ^[Yy]$ ]]; then
+    python3 bot.py
+fi

@@ -29,9 +29,22 @@ echo BOT_TOKEN=!bot_token!
 ) > .env
 
 echo.
+echo Creating standalone executable...
+pyinstaller --onefile --name BotLauncher bot.py
+
+echo.
 echo ===========================================
 echo    Installation Complete!
 echo ===========================================
-echo To start the bot, run: call .venv\Scripts\activate ^&^& python bot.py
+echo Executable created in: .\dist\BotLauncher.exe
 echo ===========================================
-pause
+echo.
+
+set /p start_bot="Would you like to start the bot now? (y/N): "
+if /i "!start_bot!"=="y" (
+    python bot.py
+) else (
+    echo.
+    echo To start the bot later, simply run BotLauncher.exe from the dist folder.
+    pause
+)
