@@ -1,13 +1,13 @@
 import os
 import shutil
-from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove, FSInputFile
+from aiogram import Router, F, Bot
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove, FSInputFile, LabeledPrice, PreCheckoutQuery
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.filters.callback_data import CallbackData
 from app.keyboards import user_keyboards as kb
-from app.common.config import main_categories, USER_FILES_DIR, translations, user_selections, icons
+from app.common.config import main_categories, USER_FILES_DIR, translations, user_selections, icons, VERSION, STORAGE_PLANS, PAYMENT_TOKEN
 from app.databases.categories_database import categories_database
 from app.databases.user_database import user_database
 from app.handlers.error_handler import log_error_to_db
@@ -37,6 +37,28 @@ def get_category_from_translated(text, lang):
         if text == trans_name:
             return eng_name
     return None
+
+def get_user_storage_usage(user_id):
+    if VERSION == "personal":
+        path = os.path.join(USER_FILES_DIR)
+    else:
+        path = os.path.join(USER_FILES_DIR, str(user_id))
+    
+    total_size = 0
+    if os.path.exists(path):
+        for dirpath, dirnames, filenames in os.walk(path):
+            for f in filenames:
+                fp = os.path.join(dirpath, f)
+                total_size += os.path.getsize(fp)
+    
+    return round(total_size / (1024 * 1024 * 1024), 2) # in GB
+
+@user_router.message(Command("language"))
+async def language_command(message: Message, state: FSMContext):
+    user_id = message.from_user.id
+    lang = db.get_language(user_id) or "English"
+    await message.answer(translations[lang]["select_language"], reply_markup=kb.get_language_keyboard())
+    await state.set_state(UserStates.selecting_language)
 
 @user_router.message(Command("start"))
 async def start_command(message: Message, state: FSMContext):
@@ -68,13 +90,6 @@ async def start_command(message: Message, state: FSMContext):
                         "/start", str(e))
         await message.answer("⚠️ Error. Try later.")
 
-@user_router.message(Command("language"))
-async def language_command(message: Message, state: FSMContext):
-    user_id = message.from_user.id
-    lang = db.get_language(user_id) or "English"
-    await message.answer(translations[lang]["select_language"], reply_markup=kb.get_language_keyboard())
-    await state.set_state(UserStates.selecting_language)
-
 @user_router.message(UserStates.selecting_language)
 async def select_language(message: Message, state: FSMContext):
     user_id = message.from_user.id
@@ -87,12 +102,77 @@ async def select_language(message: Message, state: FSMContext):
     await message.answer(translations[selected_lang]["welcome"], reply_markup=kb.get_categories_keyboard(selected_lang))
     await state.set_state(UserStates.selecting_category)
 
+@user_router.message(Command("storage"))
+async def storage_command(message: Message):
+    if VERSION != "commercial":
+        return
+    
+    user_id = message.from_user.id
+    lang = db.get_language(user_id) or "English"
+    t = translations[lang]
+    
+    usage = get_user_storage_usage(user_id)
+    limit = db.get_storage_limit(user_id)
+    
+    await message.answer(
+        t["storage_info"].format(usage, limit),
+        reply_markup=kb.get_storage_plans_keyboard(lang)
+    )
+
+@user_router.callback_query(F.data.startswith("buy_"))
+async def buy_storage_plan(callback: CallbackQuery):
+    plan_id = callback.data.split("_", 1)[1]
+    if plan_id not in STORAGE_PLANS:
+        await callback.answer("Invalid plan.")
+        return
+    
+    plan = STORAGE_PLANS[plan_id]
+    prices = [LabeledPrice(label=plan["label"], amount=plan["price"] * 100)]
+    
+    user_id = callback.from_user.id
+    lang = db.get_language(user_id) or "English"
+
+    if not PAYMENT_TOKEN:
+        await callback.message.answer("⚠️ Payment system is not configured.")
+        await callback.answer()
+        return
+
+    await callback.bot.send_invoice(
+        chat_id=callback.message.chat.id,
+        title=plan["label"],
+        description=f"Increase storage by {plan['size']} GB",
+        payload=plan_id,
+        provider_token=PAYMENT_TOKEN,
+        currency="UAH",
+        prices=prices,
+        start_parameter="storage_upgrade"
+    )
+    await callback.answer()
+
+@user_router.pre_checkout_query()
+async def pre_checkout_query_handler(pre_checkout_q: PreCheckoutQuery):
+    await pre_checkout_q.answer(ok=True)
+
+@user_router.message(F.successful_payment)
+async def successful_payment_handler(message: Message):
+    plan_id = message.successful_payment.invoice_payload
+    plan = STORAGE_PLANS.get(plan_id)
+    if plan:
+        user_id = message.from_user.id
+        db.increase_storage_limit(user_id, float(plan["size"]))
+        lang = db.get_language(user_id) or "English"
+        await message.answer(translations[lang]["payment_success"].format(plan["size"]))
+
 @user_router.message(UserStates.selecting_category)
 async def select_category(message: Message, state: FSMContext):
     try:
         user_id = message.from_user.id
         lang = db.get_language(user_id) or "English"
         t = translations[lang]
+
+        if message.text == t["buy_storage"] and VERSION == "commercial":
+            await storage_command(message)
+            return
         
         category = get_category_from_translated(message.text, lang)
 
@@ -124,7 +204,7 @@ async def select_category(message: Message, state: FSMContext):
         log_error_to_db(message.from_user.id, message.from_user.username or "N/A",
                         message.from_user.first_name or "N/A", message.from_user.last_name or "N/A",
                         "select_category", str(e))
-        await message.answer(translations[db.get_language(message.from_user.id) or "English"]["unavailable"])
+        await message.answer("⚠️ Error.")
 
 @user_router.message(UserStates.waiting_for_text, F.text)
 async def handle_text(message: Message, state: FSMContext):
@@ -215,6 +295,14 @@ async def handle_text(message: Message, state: FSMContext):
 
         category = user_selections[user_id]["category"]
         subcategory_path = user_selections[user_id]["subcategory_path"]
+
+        # Check storage limit for commercial
+        if VERSION == "commercial":
+            usage = get_user_storage_usage(user_id)
+            limit = db.get_storage_limit(user_id)
+            if usage >= limit:
+                await message.answer("⚠️ Your storage is full. Please buy more space with /storage")
+                return
 
         from app.utils.file_utils import save_text_to_file
         save_text_to_file(user_id, category, subcategory_path, text)
@@ -420,6 +508,14 @@ async def handle_file(message: Message, state: FSMContext):
 
         category = user_selections[user_id]["category"]
         subcategory_path = user_selections[user_id]["subcategory_path"]
+
+        # Check storage limit for commercial
+        if VERSION == "commercial":
+            usage = get_user_storage_usage(user_id)
+            limit = db.get_storage_limit(user_id)
+            if usage >= limit:
+                await message.answer("⚠️ Your storage is full. Please buy more space with /storage")
+                return
 
         if message.document:
             file = message.document

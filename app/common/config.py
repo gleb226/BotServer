@@ -2,20 +2,19 @@ import os
 import sys
 from dotenv import load_dotenv
 
-# Absolute path to the directory containing the executable or script
 if getattr(sys, 'frozen', False):
     BASE_DIR = os.path.dirname(os.path.realpath(sys.executable))
 else:
-    # Go up from app/common/config.py to root
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
-# Ensure .env is loaded before anything else
 env_path = os.path.join(BASE_DIR, ".env")
 if os.path.exists(env_path):
     load_dotenv(env_path, override=True)
 
-# Version control: 'personal' or 'commercial'
 VERSION = os.getenv("VERSION", "personal")
+DATABASE_TYPE = os.getenv("DATABASE_TYPE", "sqlite")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+PAYMENT_TOKEN = os.getenv("PAYMENT_TOKEN") # LikPay sandbox token
 
 if VERSION == "personal":
     USER_FILES_DIR = os.path.join(BASE_DIR, "files")
@@ -24,9 +23,15 @@ else:
     USER_FILES_DIR = os.path.join(BASE_DIR, "user_files")
     SQLITE_DB_PATH = os.path.join(BASE_DIR, "app", "databases", "bot.db")
 
-DATABASE_TYPE = os.getenv("DATABASE_TYPE", "sqlite")
-
 os.makedirs(USER_FILES_DIR, exist_ok=True)
+
+STORAGE_PLANS = {
+    "plan_10gb": {"size": 10, "price": 50, "label": "10 GB Storage"},
+    "plan_100gb": {"size": 100, "price": 125, "label": "100 GB Storage"},
+    "plan_200gb": {"size": 200, "price": 200, "label": "200 GB Storage"},
+    "plan_250gb": {"size": 250, "price": 245, "label": "250 GB Storage"},
+    "plan_500gb": {"size": 500, "price": 450, "label": "500 GB Storage"}
+}
 
 icons = {
     "Photos": "🖼️",
@@ -68,6 +73,9 @@ translations = {
         "start_over": "🔄 Please use /start",
         "unavailable": "⚠️ Error. Try later.",
         "select_language": "🌐 Select language:",
+        "storage_info": "📊 Storage: {}/{} GB used",
+        "buy_storage": "💳 Buy Storage",
+        "payment_success": "🎉 Payment successful! Your storage has been increased by {} GB.",
         "categories": {
             "Photos": "🖼️ Photos",
             "Videos": "🎬 Videos",
@@ -107,6 +115,9 @@ translations = {
         "start_over": "🔄 Використовуйте /start",
         "unavailable": "⚠️ Помилка. Спробуйте пізніше.",
         "select_language": "🌐 Оберіть мову:",
+        "storage_info": "📊 Сховище: {}/{} ГБ використано",
+        "buy_storage": "💳 Купити місце",
+        "payment_success": "🎉 Оплата успішна! Ваше сховище збільшено на {} ГБ.",
         "categories": {
             "Photos": "🖼️ Фото",
             "Videos": "🎬 Відео",

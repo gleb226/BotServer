@@ -14,10 +14,11 @@ class user_database:
                     last_name TEXT,
                     username TEXT,
                     language_code TEXT,
-                    language TEXT DEFAULT 'English',
+                    language TEXT,
                     is_premium BOOLEAN,
                     chat_id INTEGER,
                     chat_type TEXT,
+                    storage_limit_gb REAL DEFAULT 2.0,
                     joined_at TEXT
                 )
             ''')
@@ -46,10 +47,11 @@ class user_database:
                 "last_name": last_name,
                 "username": username,
                 "language_code": language_code,
-                "language": "English",
+                "language": None,
                 "is_premium": bool(is_premium),
                 "chat_id": chat_id,
                 "chat_type": chat_type,
+                "storage_limit_gb": 2.0,
                 "joined_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }
             self.collection.insert_one(user_data)
@@ -65,9 +67,27 @@ class user_database:
         if DATABASE_TYPE == "sqlite":
             self.cursor.execute("SELECT language FROM users WHERE user_id = ?", (user_id,))
             res = self.cursor.fetchone()
-            return res[0] if res else "English"
+            return res[0] if res else None
         else:
             user = self.collection.find_one({"user_id": user_id})
-            return user.get("language", "English") if user else "English"
+            return user.get("language") if user else None
+
+    def get_storage_limit(self, user_id: int):
+        if DATABASE_TYPE == "sqlite":
+            self.cursor.execute("SELECT storage_limit_gb FROM users WHERE user_id = ?", (user_id,))
+            res = self.cursor.fetchone()
+            return res[0] if res else 2.0
+        else:
+            user = self.collection.find_one({"user_id": user_id})
+            return user.get("storage_limit_gb", 2.0) if user else 2.0
+
+    def increase_storage_limit(self, user_id: int, amount_gb: float):
+        current = self.get_storage_limit(user_id)
+        new_limit = current + amount_gb
+        if DATABASE_TYPE == "sqlite":
+            self.cursor.execute("UPDATE users SET storage_limit_gb = ? WHERE user_id = ?", (new_limit, user_id))
+            self.conn.commit()
+        else:
+            self.collection.update_one({"user_id": user_id}, {"$set": {"storage_limit_gb": new_limit}})
 
 db = user_database()
