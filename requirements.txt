@@ -6,4 +6,3 @@ pymongo
 pyinstaller
 customtkinter
 pillow
-liqpay-python

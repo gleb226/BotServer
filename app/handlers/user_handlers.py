@@ -11,14 +11,44 @@ from app.common.config import main_categories, USER_FILES_DIR, translations, use
 from app.databases.categories_database import categories_database
 from app.databases.user_database import user_database
 from app.handlers.error_handler import log_error_to_db, notify_admin
-from liqpay.liqpay import LiqPay
 import uuid
 import json
 import base64
+import hashlib
+import aiohttp
 
 user_router = Router()
 cat_db = categories_database()
 db = user_database()
+
+class LiqPayManager:
+    def __init__(self, public_key, private_key):
+        self.public_key = public_key
+        self.private_key = private_key
+
+    def _get_signature(self, data):
+        sign_str = self.private_key + data + self.private_key
+        return base64.b64encode(hashlib.sha1(sign_str.encode()).digest()).decode()
+
+    def get_checkout_url(self, params):
+        params.update({'public_key': self.public_key})
+        data = base64.b64encode(json.dumps(params).encode()).decode()
+        signature = self._get_signature(data)
+        return f"https://www.liqpay.ua/api/3/checkout?data={data}&signature={signature}"
+
+    async def get_status(self, order_id):
+        params = {
+            'action': 'status',
+            'public_key': self.public_key,
+            'version': '3',
+            'order_id': order_id
+        }
+        data = base64.b64encode(json.dumps(params).encode()).decode()
+        signature = self._get_signature(data)
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.post('https://www.liqpay.ua/api/request', data={'data': data, 'signature': signature}) as response:
+                return await response.json()
 
 LOGO_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "common", "logo.jpeg")
 
@@ -163,7 +193,7 @@ async def buy_storage_plan(callback: CallbackQuery):
             await callback.answer()
             return
 
-        liqpay = LiqPay(LIQPAY_PUBLIC_KEY, LIQPAY_PRIVATE_KEY)
+        liqpay = LiqPayManager(LIQPAY_PUBLIC_KEY, LIQPAY_PRIVATE_KEY)
         order_id = str(uuid.uuid4())
 
         params = {
@@ -175,9 +205,7 @@ async def buy_storage_plan(callback: CallbackQuery):
             'version': '3'
         }
 
-        signature = liqpay.cnb_signature(params)
-        data = base64.b64encode(json.dumps(params).encode()).decode()
-        checkout_url = f"https://www.liqpay.ua/api/3/checkout?data={data}&signature={signature}"
+        checkout_url = liqpay.get_checkout_url(params)
 
         markup = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="💳 Pay on LiqPay", url=checkout_url)],
@@ -204,12 +232,8 @@ async def buy_storage_plan(callback: CallbackQuery):
 @user_router.callback_query(LiqPayCheck.filter())
 async def check_liqpay_payment(callback: CallbackQuery, callback_data: LiqPayCheck):
     try:
-        liqpay = LiqPay(LIQPAY_PUBLIC_KEY, LIQPAY_PRIVATE_KEY)
-        res = liqpay.api("request", {
-            "action": "status",
-            "version": "3",
-            "order_id": callback_data.order_id
-        })
+        liqpay = LiqPayManager(LIQPAY_PUBLIC_KEY, LIQPAY_PRIVATE_KEY)
+        res = await liqpay.get_status(callback_data.order_id)
 
         status = res.get("status")
         user_id = callback.from_user.id
@@ -232,7 +256,6 @@ async def check_liqpay_payment(callback: CallbackQuery, callback_data: LiqPayChe
 
     except Exception as e:
         await callback.answer(f"⚠️ Error checking status: {str(e)}", show_alert=True)
-
 @user_router.message(UserStates.selecting_category)
 async def select_category(message: Message, state: FSMContext):
     try:
