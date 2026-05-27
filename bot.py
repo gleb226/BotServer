@@ -60,7 +60,7 @@ class BotApp(ctk.CTk):
         self.status_text = ctk.CTkLabel(
             self.status_frame, 
             text="Status: Initializing...", 
-            font=ctk.CTkFont(size=15, weight="medium")
+            font=ctk.CTkFont(size=15, weight="bold")
         )
         self.status_text.pack(side="left", pady=10)
 
