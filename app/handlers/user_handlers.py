@@ -10,11 +10,13 @@ from app.keyboards import user_keyboards as kb
 from app.common.config import main_categories, USER_FILES_DIR, translations, user_selections, icons, VERSION, STORAGE_PLANS, PAYMENT_TOKEN
 from app.databases.categories_database import categories_database
 from app.databases.user_database import user_database
-from app.handlers.error_handler import log_error_to_db
+from app.handlers.error_handler import log_error_to_db, notify_admin
 
 user_router = Router()
 cat_db = categories_database()
 db = user_database()
+
+LOGO_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "common", "logo.jpeg")
 
 class FileAction(CallbackData, prefix="f"):
     action: str
@@ -78,16 +80,33 @@ async def start_command(message: Message, state: FSMContext):
         )
 
         lang = db.get_language(user_id)
+        
+        welcome_text = (
+            "🚀 <b>Welcome to BotServer!</b>\n\n"
+            "Your professional file management system.\n"
+            "Organize, store, and access your files anywhere."
+        )
+        
         if not lang:
-            await message.answer(translations["English"]["select_language"], reply_markup=kb.get_language_keyboard())
+            if os.path.exists(LOGO_PATH):
+                await message.answer_photo(FSInputFile(LOGO_PATH), caption=welcome_text + "\n\n🌐 Please select your language:", parse_mode="HTML", reply_markup=kb.get_language_keyboard())
+            else:
+                await message.answer(welcome_text + "\n\n🌐 Please select your language:", parse_mode="HTML", reply_markup=kb.get_language_keyboard())
             await state.set_state(UserStates.selecting_language)
         else:
-            await message.answer(translations[lang]["welcome"], reply_markup=kb.get_categories_keyboard(lang))
+            t = translations[lang]
+            msg = f"🚀 <b>{t['welcome']}</b>\n\n{t['select_category']}"
+            if os.path.exists(LOGO_PATH):
+                await message.answer_photo(FSInputFile(LOGO_PATH), caption=msg, parse_mode="HTML", reply_markup=kb.get_categories_keyboard(lang))
+            else:
+                await message.answer(msg, parse_mode="HTML", reply_markup=kb.get_categories_keyboard(lang))
             await state.set_state(UserStates.selecting_category)
     except Exception as e:
         log_error_to_db(message.from_user.id, message.from_user.username or "N/A",
                         message.from_user.first_name or "N/A", message.from_user.last_name or "N/A",
                         "/start", str(e))
+        if VERSION == "commercial":
+            await notify_admin(message.bot, message.from_user.id, message.from_user.username or "N/A", "/start", str(e))
         await message.answer("⚠️ Error. Try later.")
 
 @user_router.message(UserStates.selecting_language)
@@ -121,33 +140,42 @@ async def storage_command(message: Message):
 
 @user_router.callback_query(F.data.startswith("buy_"))
 async def buy_storage_plan(callback: CallbackQuery):
-    plan_id = callback.data.split("_", 1)[1]
-    if plan_id not in STORAGE_PLANS:
-        await callback.answer("Invalid plan.")
-        return
-    
-    plan = STORAGE_PLANS[plan_id]
-    prices = [LabeledPrice(label=plan["label"], amount=plan["price"] * 100)]
-    
-    user_id = callback.from_user.id
-    lang = db.get_language(user_id) or "English"
+    try:
+        plan_id = callback.data.split("_", 1)[1]
+        if plan_id not in STORAGE_PLANS:
+            await callback.answer("Invalid plan.")
+            return
+        
+        plan = STORAGE_PLANS[plan_id]
+        prices = [LabeledPrice(label=plan["label"], amount=plan["price"] * 100)]
+        
+        user_id = callback.from_user.id
+        lang = db.get_language(user_id) or "English"
 
-    if not PAYMENT_TOKEN:
-        await callback.message.answer("⚠️ Payment system is not configured.")
+        if not PAYMENT_TOKEN:
+            await callback.message.answer("⚠️ Payment system is not configured.")
+            await callback.answer()
+            return
+
+        await callback.bot.send_invoice(
+            chat_id=callback.message.chat.id,
+            title=plan["label"],
+            description=f"Increase storage by {plan['size']} GB",
+            payload=plan_id,
+            provider_token=PAYMENT_TOKEN,
+            currency="UAH",
+            prices=prices,
+            start_parameter="storage_upgrade"
+        )
         await callback.answer()
-        return
-
-    await callback.bot.send_invoice(
-        chat_id=callback.message.chat.id,
-        title=plan["label"],
-        description=f"Increase storage by {plan['size']} GB",
-        payload=plan_id,
-        provider_token=PAYMENT_TOKEN,
-        currency="UAH",
-        prices=prices,
-        start_parameter="storage_upgrade"
-    )
-    await callback.answer()
+    except Exception as e:
+        log_error_to_db(callback.from_user.id, callback.from_user.username or "N/A",
+                        callback.from_user.first_name or "N/A", callback.from_user.last_name or "N/A",
+                        "buy_storage_plan", str(e))
+        if VERSION == "commercial":
+            await notify_admin(callback.bot, callback.from_user.id, callback.from_user.username or "N/A", "buy_storage_plan", str(e))
+        await callback.message.answer(f"⚠️ Payment error: {str(e)}")
+        await callback.answer()
 
 @user_router.pre_checkout_query()
 async def pre_checkout_query_handler(pre_checkout_q: PreCheckoutQuery):
