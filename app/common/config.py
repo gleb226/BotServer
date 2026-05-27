@@ -14,8 +14,8 @@ if os.path.exists(env_path):
 VERSION = os.getenv("VERSION", "personal")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "513546547"))
-LIQPAY_PUBLIC_KEY = os.getenv("LIQPAY_PUBLIC_KEY")
-LIQPAY_PRIVATE_KEY = os.getenv("LIQPAY_PRIVATE_KEY")
+LIQPAY_PUBLIC_KEY = os.getenv("LIQPAY_PUBLIC_KEY") or os.getenv("PAYMENT_TOKEN")
+LIQPAY_PRIVATE_KEY = os.getenv("LIQPAY_PRIVATE_KEY") or os.getenv("PAYMENT_TOKEN_2")
 MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017")
 
 if VERSION == "commercial":
