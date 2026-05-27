@@ -59,8 +59,18 @@ To use this bot, you need a token from Telegram's official bot manager.
 3.  Follow the instructions to name your bot.
 4.  Copy the **API Token** provided (it looks like `123456:ABC-DEF...`).
 
-### 2. Database
-The bot uses **SQLite** by default. No manual setup is required. All data is automatically stored in `bot.db`.
+### 2. LiqPay API Keys (Commercial Version Only)
+For accepting payments via LiqPay website:
+1.  Register on [LiqPay.ua](https://www.liqpay.ua/).
+2.  Create a company/shop and get your **Public Key** and **Private Key**.
+3.  Add them to your `.env` file:
+    ```env
+    LIQPAY_PUBLIC_KEY=your_public_key
+    LIQPAY_PRIVATE_KEY=your_private_key
+    ```
+
+### 3. Database
+The bot uses **SQLite** by default. For commercial versions, **MongoDB** is supported via `.env` configuration.
 
 ---
 

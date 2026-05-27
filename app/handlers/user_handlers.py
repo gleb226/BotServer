@@ -7,16 +7,24 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.filters.callback_data import CallbackData
 from app.keyboards import user_keyboards as kb
-from app.common.config import main_categories, USER_FILES_DIR, translations, user_selections, icons, VERSION, STORAGE_PLANS, PAYMENT_TOKEN
+from app.common.config import main_categories, USER_FILES_DIR, translations, user_selections, icons, VERSION, STORAGE_PLANS, LIQPAY_PUBLIC_KEY, LIQPAY_PRIVATE_KEY
 from app.databases.categories_database import categories_database
 from app.databases.user_database import user_database
 from app.handlers.error_handler import log_error_to_db, notify_admin
+from liqpay.liqpay import LiqPay
+import uuid
+import json
+import base64
 
 user_router = Router()
 cat_db = categories_database()
 db = user_database()
 
 LOGO_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "common", "logo.jpeg")
+
+class LiqPayCheck(CallbackData, prefix="lpc"):
+    order_id: str
+    plan_id: str
 
 class FileAction(CallbackData, prefix="f"):
     action: str
@@ -147,25 +155,41 @@ async def buy_storage_plan(callback: CallbackQuery):
             return
         
         plan = STORAGE_PLANS[plan_id]
-        prices = [LabeledPrice(label=plan["label"], amount=plan["price"] * 100)]
-        
         user_id = callback.from_user.id
         lang = db.get_language(user_id) or "English"
 
-        if not PAYMENT_TOKEN:
-            await callback.message.answer("⚠️ Payment system is not configured.")
+        if not LIQPAY_PUBLIC_KEY or not LIQPAY_PRIVATE_KEY:
+            await callback.message.answer("⚠️ LiqPay is not configured.")
             await callback.answer()
             return
 
-        await callback.bot.send_invoice(
-            chat_id=callback.message.chat.id,
-            title=plan["label"],
-            description=f"Increase storage by {plan['size']} GB",
-            payload=plan_id,
-            provider_token=PAYMENT_TOKEN,
-            currency="UAH",
-            prices=prices,
-            start_parameter="storage_upgrade"
+        liqpay = LiqPay(LIQPAY_PUBLIC_KEY, LIQPAY_PRIVATE_KEY)
+        order_id = str(uuid.uuid4())
+        
+        params = {
+            'action': 'pay',
+            'amount': str(plan['price']),
+            'currency': 'UAH',
+            'description': f"Upgrade storage to {plan['size']} GB",
+            'order_id': order_id,
+            'version': '3'
+        }
+        
+        signature = liqpay.cnb_signature(params)
+        data = base64.b64encode(json.dumps(params).encode()).decode()
+        checkout_url = f"https://www.liqpay.ua/api/3/checkout?data={data}&signature={signature}"
+
+        markup = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="💳 Pay on LiqPay", url=checkout_url)],
+            [InlineKeyboardButton(text="🔄 Check Payment Status", callback_data=LiqPayCheck(order_id=order_id, plan_id=plan_id).pack())]
+        ])
+
+        await callback.message.answer(
+            f"🚀 <b>Plan: {plan['label']}</b>\n"
+            f"💰 <b>Price: {plan['price']} UAH</b>\n\n"
+            "Click the button below to pay on the official LiqPay website. After payment, click 'Check Status'.",
+            reply_markup=markup,
+            parse_mode="HTML"
         )
         await callback.answer()
     except Exception as e:
@@ -177,19 +201,37 @@ async def buy_storage_plan(callback: CallbackQuery):
         await callback.message.answer(f"⚠️ Payment error: {str(e)}")
         await callback.answer()
 
-@user_router.pre_checkout_query()
-async def pre_checkout_query_handler(pre_checkout_q: PreCheckoutQuery):
-    await pre_checkout_q.answer(ok=True)
-
-@user_router.message(F.successful_payment)
-async def successful_payment_handler(message: Message):
-    plan_id = message.successful_payment.invoice_payload
-    plan = STORAGE_PLANS.get(plan_id)
-    if plan:
-        user_id = message.from_user.id
-        db.increase_storage_limit(user_id, float(plan["size"]))
+@user_router.callback_query(LiqPayCheck.filter())
+async def check_liqpay_payment(callback: CallbackQuery, callback_data: LiqPayCheck):
+    try:
+        liqpay = LiqPay(LIQPAY_PUBLIC_KEY, LIQPAY_PRIVATE_KEY)
+        res = liqpay.api("request", {
+            "action": "status",
+            "version": "3",
+            "order_id": callback_data.order_id
+        })
+        
+        status = res.get("status")
+        user_id = callback.from_user.id
         lang = db.get_language(user_id) or "English"
-        await message.answer(translations[lang]["payment_success"].format(plan["size"]))
+        
+        if status in ["success", "wait_accept"]:
+            plan_id = callback_data.plan_id
+            plan = STORAGE_PLANS.get(plan_id)
+            if plan:
+                db.increase_storage_limit(user_id, float(plan["size"]))
+                await callback.message.answer(translations[lang]["payment_success"].format(plan["size"]))
+                try: await callback.message.delete()
+                except: pass
+        elif status == "failure":
+            await callback.message.answer("❌ Payment failed. Please try again.")
+        elif status == "reversed":
+            await callback.message.answer("⚠️ Payment was reversed.")
+        else:
+            await callback.answer("⏳ Payment not found or still processing. Try in a few seconds.", show_alert=True)
+            
+    except Exception as e:
+        await callback.answer(f"⚠️ Error checking status: {str(e)}", show_alert=True)
 
 @user_router.message(UserStates.selecting_category)
 async def select_category(message: Message, state: FSMContext):
