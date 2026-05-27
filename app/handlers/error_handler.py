@@ -1,7 +1,6 @@
 from datetime import datetime
 from functools import wraps
 from app.common.config import DATABASE_TYPE, ADMIN_ID, VERSION
-
 async def notify_admin(bot, user_id: int, username: str, command: str, error_message: str):
     try:
         text = (
@@ -16,10 +15,8 @@ async def notify_admin(bot, user_id: int, username: str, command: str, error_mes
         await bot.send_message(chat_id=ADMIN_ID, text=text, parse_mode="HTML")
     except Exception as e:
         print(f"Failed to notify admin: {e}")
-
 def log_error_to_db(user_id: int, username: str, firstname: str, lastname: str, command: str, error_message: str):
     if DATABASE_TYPE == "sqlite":
-
         pass
     else:
         try:
@@ -36,7 +33,6 @@ def log_error_to_db(user_id: int, username: str, firstname: str, lastname: str, 
             errors_collection.insert_one(error_data)
         except Exception as e:
             print(f"Failed to log error to MongoDB: {e}")
-
 def error_handler(command: str):
     def decorator(func):
         @wraps(func)

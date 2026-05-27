@@ -28,22 +28,36 @@ async def background_scheduler(bot: Bot):
         try:
             pending = db.get_pending_payments()
             for item in pending:
-                if isinstance(item, tuple): u_id, o_id, p_id = item
-                else: u_id, o_id, p_id = item['user_id'], item['pending_order_id'], item['pending_plan_id']
+                if isinstance(item, tuple):
+                    u_id, o_id, p_id = item
+                else:
+                    u_id = item.get('user_id')
+                    o_id = item.get('pending_order_id')
+                    p_id = item.get('pending_plan_id')
+                
                 res = await liqpay.get_status(o_id)
                 if res.get("status") in ["success", "wait_accept"]:
                     plan = STORAGE_PLANS.get(p_id)
                     if plan:
-                        db.set_storage_limit(u_id, float(plan["size"]))
+                        new_limit = float(plan["size"])
+                        db.set_storage_limit(u_id, new_limit)
                         db.clear_pending_payment(u_id)
                         lang = db.get_language(u_id) or "English"
-                        try: await bot.send_message(u_id, translations[lang]["payment_success"].format(plan["size"]))
-                        except: pass
-
+                        try:
+                            await bot.send_message(u_id, translations[lang]["payment_success"].format(new_limit))
+                        except:
+                            pass
+            
             users = db.get_all_users_with_subscription()
             for user in users:
-                if isinstance(user, tuple): u_id, last_pay, limit, lang = user
-                else: u_id, last_pay, limit, lang = user['user_id'], user['last_payment_date'], user['storage_limit_gb'], user['language']
+                if isinstance(user, tuple):
+                    u_id, last_pay, limit, lang = user
+                else:
+                    u_id = user.get('user_id')
+                    last_pay = user.get('last_payment_date')
+                    limit = user.get('storage_limit_gb')
+                    lang = user.get('language')
+                
                 if last_pay:
                     pay_date = datetime.strptime(last_pay, "%Y-%m-%d")
                     days_passed = (datetime.now() - pay_date).days
@@ -52,16 +66,21 @@ async def background_scheduler(bot: Bot):
                     if days_passed >= 30:
                         db.set_storage_limit(u_id, 2.0)
                         clear_user_data(u_id)
-                        try: await bot.send_message(u_id, t["subscription_cancelled"])
-                        except: pass
+                        try:
+                            await bot.send_message(u_id, t["subscription_cancelled"])
+                        except:
+                            pass
                     elif days_passed >= 27:
                         kb = InlineKeyboardMarkup(inline_keyboard=[
                             [InlineKeyboardButton(text=t["renew_button"], callback_data="renew_sub")],
                             [InlineKeyboardButton(text=t["cancel_subscription"], callback_data="cancel_sub_confirm")]
                         ])
-                        try: await bot.send_message(u_id, t["subscription_reminder"], reply_markup=kb)
-                        except: pass
-        except Exception as e: print(f"Scheduler error: {e}")
+                        try:
+                            await bot.send_message(u_id, t["subscription_reminder"], reply_markup=kb)
+                        except:
+                            pass
+        except Exception as e:
+            print(f"Scheduler error: {e}")
         await asyncio.sleep(3600)
 
 class BotApp(ctk.CTk):
@@ -98,26 +117,40 @@ class BotApp(ctk.CTk):
         self.bot_thread.start()
 
     def update_status(self, text, color, dot_color=None):
-        self.status_text.configure(text=f"Status: {text}"); self.status_text.configure(text_color=color)
-        if dot_color: self.status_dot.configure(text_color=dot_color)
+        self.status_text.configure(text=f"Status: {text}")
+        self.status_text.configure(text_color=color)
+        if dot_color:
+            self.status_dot.configure(text_color=dot_color)
 
     def run_bot_async(self):
-        self.loop = asyncio.new_event_loop(); asyncio.set_event_loop(self.loop)
-        try: self.loop.run_until_complete(self.start_bot())
-        except Exception as e: self.after(0, lambda: self.update_status(f"Error: {str(e)[:20]}...", "red", "red"))
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
+        try:
+            self.loop.run_until_complete(self.start_bot())
+        except Exception as e:
+            self.after(0, lambda: self.update_status(f"Error: {str(e)[:20]}...", "red", "red"))
 
     async def start_bot(self):
-        if not TOKEN: self.after(0, lambda: self.update_status("Token Missing", "red", "red")); return
+        if not TOKEN:
+            self.after(0, lambda: self.update_status("Token Missing", "red", "red"))
+            return
         try:
-            bot = Bot(token=TOKEN); dp = Dispatcher(); dp.include_router(user_router)
+            bot = Bot(token=TOKEN)
+            dp = Dispatcher()
+            dp.include_router(user_router)
             self.after(0, lambda: self.update_status("Active", "#2ECC71", "#2ECC71"))
             self.after(0, lambda: self.info_label.configure(text="Bot is running and accepting connections", text_color="#2ECC71"))
             asyncio.create_task(background_scheduler(bot))
             await dp.start_polling(bot)
-        except Exception as e: self.after(0, lambda: self.update_status("Critical Error", "red", "red"))
-        finally: await bot.session.close()
+        except Exception as e:
+            self.after(0, lambda: self.update_status("Critical Error", "red", "red"))
+        finally:
+            await bot.session.close()
 
-    def stop_bot(self): self.destroy(); sys.exit(0)
+    def stop_bot(self):
+        self.destroy()
+        sys.exit(0)
 
 if __name__ == "__main__":
-    app = BotApp(); app.mainloop()
+    app = BotApp()
+    app.mainloop()

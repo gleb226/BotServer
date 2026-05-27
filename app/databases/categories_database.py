@@ -1,6 +1,5 @@
 import sqlite3
 from app.common.config import DATABASE_TYPE, SQLITE_DB_PATH
-
 class categories_database:
     def __init__(self):
         if DATABASE_TYPE == "sqlite":
@@ -15,7 +14,8 @@ class categories_database:
                     parent_subcategory TEXT DEFAULT NULL,
                     UNIQUE(user_id, category, subcategory, parent_subcategory)
                 )
-            ''')
+            '''
+               )
             self.conn.commit()
         else:
             from app.databases.mongodb_client import categories_collection
@@ -24,14 +24,14 @@ class categories_database:
                 [("user_id", 1), ("category", 1), ("subcategory", 1), ("parent_subcategory", 1)],
                 unique=True
             )
-
     def add_subcategory(self, user_id, category, subcategory, parent_subcategory=None):
         try:
             if DATABASE_TYPE == "sqlite":
                 self.cursor.execute('''
                     INSERT INTO subcategories (user_id, category, subcategory, parent_subcategory)
                     VALUES (?, ?, ?, ?)
-                ''', (user_id, category, subcategory, parent_subcategory))
+                '''
+                   , (user_id, category, subcategory, parent_subcategory))
                 self.conn.commit()
                 return True
             else:
@@ -45,17 +45,18 @@ class categories_database:
                 return True
         except Exception:
             return False
-
     def delete_subcategory(self, user_id, category, subcategory, parent_subcategory=None):
         if DATABASE_TYPE == "sqlite":
             self.cursor.execute('''
-                DELETE FROM subcategories 
+                DELETE FROM subcategories
                 WHERE user_id = ? AND category = ? AND subcategory = ? AND parent_subcategory = ?
-            ''', (user_id, category, subcategory, parent_subcategory))
+            '''
+               , (user_id, category, subcategory, parent_subcategory))
             self.cursor.execute('''
-                DELETE FROM subcategories 
+                DELETE FROM subcategories
                 WHERE user_id = ? AND category = ? AND parent_subcategory = ?
-            ''', (user_id, category, subcategory))
+            '''
+               , (user_id, category, subcategory))
             self.conn.commit()
         else:
             self.collection.delete_one({
@@ -69,21 +70,22 @@ class categories_database:
                 "category": category,
                 "parent_subcategory": subcategory
             })
-
     def get_subcategories(self, user_id, category, parent_subcategory=None):
         if DATABASE_TYPE == "sqlite":
             if parent_subcategory:
                 self.cursor.execute('''
-                    SELECT subcategory FROM subcategories 
+                    SELECT subcategory FROM subcategories
                     WHERE user_id = ? AND category = ? AND parent_subcategory = ?
                     ORDER BY subcategory ASC
-                ''', (user_id, category, parent_subcategory))
+                '''
+                   , (user_id, category, parent_subcategory))
             else:
                 self.cursor.execute('''
-                    SELECT subcategory FROM subcategories 
+                    SELECT subcategory FROM subcategories
                     WHERE user_id = ? AND category = ? AND parent_subcategory IS NULL
                     ORDER BY subcategory ASC
-                ''', (user_id, category))
+                '''
+                   , (user_id, category))
             results = self.cursor.fetchall()
             return [res[0] for res in results]
         else:
@@ -93,19 +95,20 @@ class categories_database:
                 "parent_subcategory": parent_subcategory
             }).sort("subcategory", 1)
             return [doc["subcategory"] for doc in results]
-
     def subcategory_exists(self, user_id, category, subcategory, parent_subcategory=None):
         if DATABASE_TYPE == "sqlite":
             if parent_subcategory:
                 self.cursor.execute('''
-                    SELECT COUNT(*) FROM subcategories 
+                    SELECT COUNT(*) FROM subcategories
                     WHERE user_id = ? AND category = ? AND subcategory = ? AND parent_subcategory = ?
-                ''', (user_id, category, subcategory, parent_subcategory))
+                '''
+                   , (user_id, category, subcategory, parent_subcategory))
             else:
                 self.cursor.execute('''
-                    SELECT COUNT(*) FROM subcategories 
+                    SELECT COUNT(*) FROM subcategories
                     WHERE user_id = ? AND category = ? AND subcategory = ? AND parent_subcategory IS NULL
-                ''', (user_id, category, subcategory))
+                '''
+                   , (user_id, category, subcategory))
             return self.cursor.fetchone()[0] > 0
         else:
             count = self.collection.count_documents({
@@ -115,7 +118,6 @@ class categories_database:
                 "parent_subcategory": parent_subcategory
             })
             return count > 0
-
     def close(self):
         if DATABASE_TYPE == "sqlite":
             self.conn.close()

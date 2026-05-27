@@ -17,25 +17,20 @@ import json
 import base64
 import hashlib
 import aiohttp
-
 user_router = Router()
 cat_db = categories_database()
-
 class LiqPayManager:
     def __init__(self, public_key, private_key):
         self.public_key = public_key
         self.private_key = private_key
-
     def _get_signature(self, data):
         sign_str = self.private_key + data + self.private_key
         return base64.b64encode(hashlib.sha1(sign_str.encode()).digest()).decode()
-
     def get_checkout_url(self, params):
         params.update({'public_key': self.public_key})
         data = base64.b64encode(json.dumps(params).encode()).decode()
         signature = self._get_signature(data)
         return f"https://www.liqpay.ua/api/3/checkout?data={data}&signature={signature}"
-
     async def get_status(self, order_id):
         params = {
             'action': 'status',
@@ -48,15 +43,12 @@ class LiqPayManager:
         async with aiohttp.ClientSession() as session:
             async with session.post('https://www.liqpay.ua/api/request', data={'data': data, 'signature': signature}) as response:
                 return await response.json()
-
 LOGO_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "common", "logo.jpeg")
-
 class FileAction(CallbackData, prefix="f"):
     action: str
     category: str
     subcategory: str = ""
     filename: str = ""
-
 class UserStates(StatesGroup):
     selecting_language = State()
     waiting_for_file = State()
@@ -65,14 +57,12 @@ class UserStates(StatesGroup):
     selecting_category = State()
     selecting_subcategory = State()
     deleting_subcategory = State()
-
 def get_category_from_translated(text, lang):
     t_cats = translations[lang]["categories"]
     for eng_name, trans_name in t_cats.items():
         if text == trans_name:
             return eng_name
     return None
-
 def get_user_storage_usage(user_id):
     path = os.path.join(USER_FILES_DIR) if VERSION == "personal" else os.path.join(USER_FILES_DIR, str(user_id))
     total_size = 0
@@ -81,20 +71,17 @@ def get_user_storage_usage(user_id):
             for f in filenames:
                 total_size += os.path.getsize(os.path.join(dirpath, f))
     return round(total_size / (1024 * 1024 * 1024), 2)
-
 @user_router.message(Command("language"))
 async def language_command(message: Message, state: FSMContext):
     user_id = message.from_user.id
     lang = db.get_language(user_id) or "English"
     await message.answer(translations[lang]["select_language"], reply_markup=kb.get_language_keyboard())
     await state.set_state(UserStates.selecting_language)
-
 @user_router.message(Command("start"))
 async def start_command(message: Message, state: FSMContext):
     try:
         user_id = message.from_user.id
         user_selections[user_id] = {"category": None, "subcategory_path": []}
-        
         db.add_user(
             user_id=user_id,
             first_name=message.from_user.first_name,
@@ -105,10 +92,8 @@ async def start_command(message: Message, state: FSMContext):
             chat_id=message.chat.id,
             chat_type=message.chat.type
         )
-
         lang_code = message.from_user.language_code
         auto_lang = "Ukrainian" if lang_code in ["uk", "ru"] else "English"
-        
         await message.answer(translations[auto_lang]["select_language"], reply_markup=kb.get_language_keyboard())
         await state.set_state(UserStates.selecting_language)
     except Exception as e:
@@ -116,7 +101,6 @@ async def start_command(message: Message, state: FSMContext):
         if VERSION == "commercial":
             await notify_admin(message.bot, message.from_user.id, message.from_user.username or "N/A", "/start", str(e))
         await message.answer("⚠️ Error.")
-
 @user_router.message(UserStates.selecting_language)
 async def select_language(message: Message, state: FSMContext):
     user_id = message.from_user.id
@@ -127,7 +111,6 @@ async def select_language(message: Message, state: FSMContext):
     db.set_language(user_id, selected_lang)
     await message.answer(translations[selected_lang]["welcome"], reply_markup=kb.get_categories_keyboard(selected_lang))
     await state.set_state(UserStates.selecting_category)
-
 @user_router.message(Command("storage"))
 async def storage_command(message: Message):
     if VERSION != "commercial":
@@ -138,12 +121,10 @@ async def storage_command(message: Message):
     usage = get_user_storage_usage(user_id)
     limit = db.get_storage_limit(user_id)
     await message.answer(t["storage_info"].format(usage, limit), reply_markup=kb.get_storage_plans_keyboard(lang))
-
 @user_router.callback_query(F.data == "renew_sub")
 async def renew_sub_handler(callback: CallbackQuery):
     await storage_command(callback.message)
     await callback.answer()
-
 @user_router.callback_query(F.data == "cancel_sub_confirm")
 async def cancel_sub_handler(callback: CallbackQuery):
     user_id = callback.from_user.id
@@ -152,26 +133,21 @@ async def cancel_sub_handler(callback: CallbackQuery):
     clear_user_data(user_id)
     await callback.message.answer(translations[lang]["subscription_cancelled"])
     await callback.answer()
-
 @user_router.callback_query(F.data.startswith("buy_"))
 async def buy_storage_plan(callback: CallbackQuery):
     try:
         plan_id = callback.data.split("_", 1)[1]
         if plan_id not in STORAGE_PLANS:
             return
-        
         plan = STORAGE_PLANS[plan_id]
         user_id = callback.from_user.id
         lang = db.get_language(user_id) or "English"
         t = translations[lang]
-
         if not LIQPAY_PUBLIC_KEY or not LIQPAY_PRIVATE_KEY:
             await callback.message.answer("⚠️ Configuration error.")
             return
-
         liqpay = LiqPayManager(LIQPAY_PUBLIC_KEY, LIQPAY_PRIVATE_KEY)
         order_id = str(uuid.uuid4())
-        
         params = {
             'action': 'pay',
             'amount': str(plan['price']),
@@ -180,14 +156,11 @@ async def buy_storage_plan(callback: CallbackQuery):
             'order_id': order_id,
             'version': '3'
         }
-        
         checkout_url = liqpay.get_checkout_url(params)
         db.set_pending_payment(user_id, order_id, plan_id)
-
         markup = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text=t["pay_button"], url=checkout_url)]
         ])
-
         await callback.message.answer(
             t["plan_info"].format(plan['label'], plan['price']),
             reply_markup=markup,
@@ -197,23 +170,19 @@ async def buy_storage_plan(callback: CallbackQuery):
     except Exception as e:
         log_error_to_db(callback.from_user.id, callback.from_user.username or "N/A", "N/A", "N/A", "buy_storage", str(e))
         await callback.answer()
-
 @user_router.message(UserStates.selecting_category)
 async def select_category(message: Message, state: FSMContext):
     try:
         user_id = message.from_user.id
         lang = db.get_language(user_id) or "English"
         t = translations[lang]
-
         if message.text == t["buy_storage"] and VERSION == "commercial":
             await storage_command(message)
             return
-        
         category = get_category_from_translated(message.text, lang)
         if not category:
             await message.answer(t["invalid_category"])
             return
-
         user_selections[user_id] = {"category": category, "subcategory_path": []}
         buttons = [
             [
@@ -223,14 +192,12 @@ async def select_category(message: Message, state: FSMContext):
         ]
         await message.answer(t["select_subcategory"], reply_markup=kb.get_subcategories_keyboard(user_id, category, "", language=lang))
         await message.answer(t["file_actions"], reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
-        
         if category in ["Passwords", "Contacts"]:
             await state.set_state(UserStates.waiting_for_text)
         else:
             await state.set_state(UserStates.waiting_for_file)
     except Exception as e:
         log_error_to_db(message.from_user.id, message.from_user.username or "N/A", "N/A", "N/A", "select_category", str(e))
-
 @user_router.message(UserStates.waiting_for_text, F.text)
 async def handle_text(message: Message, state: FSMContext):
     try:
@@ -238,12 +205,10 @@ async def handle_text(message: Message, state: FSMContext):
         text = message.text
         lang = db.get_language(user_id) or "English"
         t = translations[lang]
-
         if text == t["add_subcategory"]:
             await message.answer(t["enter_subcategory_name"], reply_markup=ReplyKeyboardRemove())
             await state.set_state(UserStates.waiting_for_subcategory_name)
             return
-
         if text == t["delete_subcategory"]:
             category = user_selections[user_id]["category"]
             sub_path = user_selections[user_id]["subcategory_path"]
@@ -255,7 +220,6 @@ async def handle_text(message: Message, state: FSMContext):
             await message.answer(t["select_subcategory_to_delete"], reply_markup=kb.get_delete_subcategories_keyboard(user_id, category, curr, language=lang))
             await state.set_state(UserStates.deleting_subcategory)
             return
-
         if text == t["back"]:
             sub_path = user_selections[user_id]["subcategory_path"]
             if not sub_path:
@@ -270,7 +234,6 @@ async def handle_text(message: Message, state: FSMContext):
                 await message.answer(t["select_subcategory"], reply_markup=kb.get_subcategories_keyboard(user_id, category, new_p, language=lang))
                 await message.answer(t["file_actions"], reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
             return
-
         if text.startswith("📁 "):
             actual = text[2:]
             category = user_selections[user_id]["category"]
@@ -284,22 +247,18 @@ async def handle_text(message: Message, state: FSMContext):
                 await message.answer(t["select_subcategory"], reply_markup=kb.get_subcategories_keyboard(user_id, category, new_p, language=lang))
                 await message.answer(t["file_actions"], reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
                 return
-
         if user_id not in user_selections:
             await message.answer(t["start_over"])
             return
-
         category = user_selections[user_id]["category"]
         if VERSION == "commercial" and get_user_storage_usage(user_id) >= db.get_storage_limit(user_id):
             await message.answer("⚠️ Full. Buy more: /storage")
             return
-
         from app.utils.file_utils import save_text_to_file
         save_text_to_file(user_id, category, user_selections[user_id]["subcategory_path"], text)
         await message.answer(t["text_saved"])
     except Exception as e:
         log_error_to_db(message.from_user.id, message.from_user.username or "N/A", "N/A", "N/A", "handle_text", str(e))
-
 @user_router.message(UserStates.waiting_for_file, F.text)
 async def handle_file_text_commands(message: Message, state: FSMContext):
     try:
@@ -351,7 +310,6 @@ async def handle_file_text_commands(message: Message, state: FSMContext):
     except Exception as e:
         log_error_to_db(message.from_user.id, message.from_user.username or "N/A", "N/A", "N/A", "handle_file_text", str(e))
         if VERSION == "commercial": await notify_admin(message.bot, message.from_user.id, message.from_user.username or "N/A", "handle_file_text", str(e))
-
 @user_router.message(UserStates.waiting_for_subcategory_name)
 async def add_subcategory_finish(message: Message, state: FSMContext):
     try:
@@ -375,7 +333,6 @@ async def add_subcategory_finish(message: Message, state: FSMContext):
         await state.set_state(UserStates.waiting_for_text if category in ["Passwords", "Contacts"] else UserStates.waiting_for_file)
     except Exception as e:
         log_error_to_db(message.from_user.id, message.from_user.username or "N/A", "N/A", "N/A", "add_subcategory", str(e))
-
 @user_router.message(UserStates.deleting_subcategory)
 async def delete_subcategory_confirm(message: Message, state: FSMContext):
     try:
@@ -401,7 +358,6 @@ async def delete_subcategory_confirm(message: Message, state: FSMContext):
         await state.set_state(UserStates.waiting_for_text if category in ["Passwords", "Contacts"] else UserStates.waiting_for_file)
     except Exception as e:
         log_error_to_db(message.from_user.id, message.from_user.username or "N/A", "N/A", "N/A", "delete_subcategory", str(e))
-
 @user_router.message(UserStates.waiting_for_file, F.document | F.photo | F.video | F.audio)
 async def handle_file(message: Message, state: FSMContext):
     try:
@@ -440,7 +396,6 @@ async def handle_file(message: Message, state: FSMContext):
         log_error_to_db(message.from_user.id, message.from_user.username or "N/A", "N/A", "N/A", "handle_file", str(e))
         if VERSION == "commercial": await notify_admin(message.bot, message.from_user.id, message.from_user.username or "N/A", "handle_file", str(e))
         await message.answer("⚠️ Error.")
-
 @user_router.callback_query(FileAction.filter(F.action == "view"))
 async def view_files(callback: CallbackQuery, callback_data: FileAction):
     try:
@@ -473,7 +428,6 @@ async def view_files(callback: CallbackQuery, callback_data: FileAction):
     except Exception as e:
         log_error_to_db(callback.from_user.id, callback.from_user.username or "N/A", "N/A", "N/A", "view_files", str(e))
         await callback.answer()
-
 @user_router.callback_query(FileAction.filter(F.action == "delete_menu"))
 async def delete_files_menu(callback: CallbackQuery, callback_data: FileAction):
     try:
@@ -507,7 +461,6 @@ async def delete_files_menu(callback: CallbackQuery, callback_data: FileAction):
     except Exception as e:
         log_error_to_db(callback.from_user.id, callback.from_user.username or "N/A", "N/A", "N/A", "delete_files_menu", str(e))
         await callback.answer()
-
 @user_router.callback_query(FileAction.filter(F.action == "delete_file"))
 async def delete_file_handler(callback: CallbackQuery, callback_data: FileAction):
     try:
@@ -533,7 +486,6 @@ async def delete_file_handler(callback: CallbackQuery, callback_data: FileAction
     except Exception as e:
         log_error_to_db(callback.from_user.id, callback.from_user.username or "N/A", "N/A", "N/A", "delete_file", str(e))
         await callback.answer()
-
 @user_router.callback_query(FileAction.filter(F.action == "delete_all"))
 async def delete_all_files_handler(callback: CallbackQuery, callback_data: FileAction):
     try:

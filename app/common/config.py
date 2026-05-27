@@ -30,11 +30,11 @@ else:
 os.makedirs(USER_FILES_DIR, exist_ok=True)
 
 STORAGE_PLANS = {
-    "plan_10gb": {"size": 10, "price": 50, "label": "10 GB Storage"},
-    "plan_100gb": {"size": 100, "price": 125, "label": "100 GB Storage"},
-    "plan_200gb": {"size": 200, "price": 200, "label": "200 GB Storage"},
-    "plan_250gb": {"size": 250, "price": 245, "label": "250 GB Storage"},
-    "plan_500gb": {"size": 500, "price": 450, "label": "500 GB Storage"}
+    "plan_10gb": {"size": 12, "price": 50, "label": "12 GB Storage"},
+    "plan_100gb": {"size": 102, "price": 125, "label": "102 GB Storage"},
+    "plan_200gb": {"size": 202, "price": 200, "label": "202 GB Storage"},
+    "plan_250gb": {"size": 252, "price": 245, "label": "252 GB Storage"},
+    "plan_500gb": {"size": 502, "price": 450, "label": "502 GB Storage"}
 }
 
 icons = {
