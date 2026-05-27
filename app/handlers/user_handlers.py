@@ -488,6 +488,9 @@ async def handle_file_text_commands(message: Message, state: FSMContext):
         log_error_to_db(message.from_user.id, message.from_user.username or "N/A",
                         message.from_user.first_name or "N/A", message.from_user.last_name or "N/A",
                         "handle_file_text", str(e))
+        if VERSION == "commercial":
+            await notify_admin(message.bot, message.from_user.id, message.from_user.username or "N/A", "handle_file_text", str(e))
+        await message.answer("⚠️ Error.")
 
 @user_router.message(UserStates.waiting_for_subcategory_name)
 async def add_subcategory_finish(message: Message, state: FSMContext):
@@ -647,6 +650,8 @@ async def handle_file(message: Message, state: FSMContext):
         log_error_to_db(message.from_user.id, message.from_user.username or "N/A",
                         message.from_user.first_name or "N/A", message.from_user.last_name or "N/A",
                         "handle_file", str(e))
+        if VERSION == "commercial":
+            await notify_admin(message.bot, message.from_user.id, message.from_user.username or "N/A", "handle_file", str(e))
         await message.answer("⚠️ Error.")
 
 @user_router.callback_query(FileAction.filter(F.action == "view"))
