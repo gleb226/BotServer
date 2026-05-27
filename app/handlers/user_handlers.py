@@ -134,10 +134,7 @@ async def start_command(message: Message, state: FSMContext):
         else:
             t = translations[lang]
             msg = f"🚀 <b>{t['welcome']}</b>\n\n{t['select_category']}"
-            if os.path.exists(LOGO_PATH):
-                await message.answer_photo(FSInputFile(LOGO_PATH), caption=msg, parse_mode="HTML", reply_markup=kb.get_categories_keyboard(lang))
-            else:
-                await message.answer(msg, parse_mode="HTML", reply_markup=kb.get_categories_keyboard(lang))
+            await message.answer(msg, parse_mode="HTML", reply_markup=kb.get_categories_keyboard(lang))
             await state.set_state(UserStates.selecting_category)
     except Exception as e:
         log_error_to_db(message.from_user.id, message.from_user.username or "N/A",
