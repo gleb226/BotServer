@@ -59,18 +59,8 @@ To use this bot, you need a token from Telegram's official bot manager.
 3.  Follow the instructions to name your bot.
 4.  Copy the **API Token** provided (it looks like `123456:ABC-DEF...`).
 
-### 2. Payment Token (Commercial Version Only)
-If you want to accept payments for extra storage, you need a provider token.
-1.  Go back to **[@BotFather](https://t.me/botfather)**.
-2.  Send `/mybots` and select your bot.
-3.  Go to **Bot Settings** -> **Payments**.
-4.  Choose a provider (e.g., **LiqPay** for Ukraine).
-5.  BotFather will give you a **Provider Token**.
-6.  Add this token to your `.env` file as `PAYMENT_TOKEN=your_token_here`.
-
-### 3. Database Management
-- **SQLite (Default):** No setup required. Everything is stored in `bot.db`.
-- **MongoDB (Scalable):** For commercial versions, update `.env` with `DATABASE_TYPE=mongodb` and `MONGO_URL=your_connection_string`.
+### 2. Database
+The bot uses **SQLite** by default. No manual setup is required. All data is automatically stored in `bot.db`.
 
 ---
 
