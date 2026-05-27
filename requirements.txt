@@ -6,3 +6,4 @@ pymongo
 pyinstaller
 customtkinter
 pillow
+aiohttp
