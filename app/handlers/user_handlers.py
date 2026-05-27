@@ -53,15 +53,15 @@ def get_user_storage_usage(user_id):
         path = os.path.join(USER_FILES_DIR)
     else:
         path = os.path.join(USER_FILES_DIR, str(user_id))
-    
+
     total_size = 0
     if os.path.exists(path):
         for dirpath, dirnames, filenames in os.walk(path):
             for f in filenames:
                 fp = os.path.join(dirpath, f)
                 total_size += os.path.getsize(fp)
-    
-    return round(total_size / (1024 * 1024 * 1024), 2) # in GB
+
+    return round(total_size / (1024 * 1024 * 1024), 2)        
 
 @user_router.message(Command("language"))
 async def language_command(message: Message, state: FSMContext):
@@ -88,13 +88,13 @@ async def start_command(message: Message, state: FSMContext):
         )
 
         lang = db.get_language(user_id)
-        
+
         welcome_text = (
             "🚀 <b>Welcome to BotServer!</b>\n\n"
             "Your professional file management system.\n"
             "Organize, store, and access your files anywhere."
         )
-        
+
         if not lang:
             if os.path.exists(LOGO_PATH):
                 await message.answer_photo(FSInputFile(LOGO_PATH), caption=welcome_text + "\n\n🌐 Please select your language:", parse_mode="HTML", reply_markup=kb.get_language_keyboard())
@@ -124,7 +124,7 @@ async def select_language(message: Message, state: FSMContext):
     if selected_lang not in ["English", "Ukrainian"]:
         await message.answer("🌐 Please select a language from the menu.")
         return
-    
+
     db.set_language(user_id, selected_lang)
     await message.answer(translations[selected_lang]["welcome"], reply_markup=kb.get_categories_keyboard(selected_lang))
     await state.set_state(UserStates.selecting_category)
@@ -133,14 +133,14 @@ async def select_language(message: Message, state: FSMContext):
 async def storage_command(message: Message):
     if VERSION != "commercial":
         return
-    
+
     user_id = message.from_user.id
     lang = db.get_language(user_id) or "English"
     t = translations[lang]
-    
+
     usage = get_user_storage_usage(user_id)
     limit = db.get_storage_limit(user_id)
-    
+
     await message.answer(
         t["storage_info"].format(usage, limit),
         reply_markup=kb.get_storage_plans_keyboard(lang)
@@ -153,7 +153,7 @@ async def buy_storage_plan(callback: CallbackQuery):
         if plan_id not in STORAGE_PLANS:
             await callback.answer("Invalid plan.")
             return
-        
+
         plan = STORAGE_PLANS[plan_id]
         user_id = callback.from_user.id
         lang = db.get_language(user_id) or "English"
@@ -165,7 +165,7 @@ async def buy_storage_plan(callback: CallbackQuery):
 
         liqpay = LiqPay(LIQPAY_PUBLIC_KEY, LIQPAY_PRIVATE_KEY)
         order_id = str(uuid.uuid4())
-        
+
         params = {
             'action': 'pay',
             'amount': str(plan['price']),
@@ -174,7 +174,7 @@ async def buy_storage_plan(callback: CallbackQuery):
             'order_id': order_id,
             'version': '3'
         }
-        
+
         signature = liqpay.cnb_signature(params)
         data = base64.b64encode(json.dumps(params).encode()).decode()
         checkout_url = f"https://www.liqpay.ua/api/3/checkout?data={data}&signature={signature}"
@@ -210,11 +210,11 @@ async def check_liqpay_payment(callback: CallbackQuery, callback_data: LiqPayChe
             "version": "3",
             "order_id": callback_data.order_id
         })
-        
+
         status = res.get("status")
         user_id = callback.from_user.id
         lang = db.get_language(user_id) or "English"
-        
+
         if status in ["success", "wait_accept"]:
             plan_id = callback_data.plan_id
             plan = STORAGE_PLANS.get(plan_id)
@@ -229,7 +229,7 @@ async def check_liqpay_payment(callback: CallbackQuery, callback_data: LiqPayChe
             await callback.message.answer("⚠️ Payment was reversed.")
         else:
             await callback.answer("⏳ Payment not found or still processing. Try in a few seconds.", show_alert=True)
-            
+
     except Exception as e:
         await callback.answer(f"⚠️ Error checking status: {str(e)}", show_alert=True)
 
@@ -243,7 +243,7 @@ async def select_category(message: Message, state: FSMContext):
         if message.text == t["buy_storage"] and VERSION == "commercial":
             await storage_command(message)
             return
-        
+
         category = get_category_from_translated(message.text, lang)
 
         if not category:
@@ -366,7 +366,6 @@ async def handle_text(message: Message, state: FSMContext):
         category = user_selections[user_id]["category"]
         subcategory_path = user_selections[user_id]["subcategory_path"]
 
-        # Check storage limit for commercial
         if VERSION == "commercial":
             usage = get_user_storage_usage(user_id)
             limit = db.get_storage_limit(user_id)
@@ -579,7 +578,6 @@ async def handle_file(message: Message, state: FSMContext):
         category = user_selections[user_id]["category"]
         subcategory_path = user_selections[user_id]["subcategory_path"]
 
-        # Check storage limit for commercial
         if VERSION == "commercial":
             usage = get_user_storage_usage(user_id)
             limit = db.get_storage_limit(user_id)

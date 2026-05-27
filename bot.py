@@ -22,16 +22,13 @@ class BotApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        # Window Configuration
         self.title("BotServer Management Console")
         self.geometry("500x400")
         self.resizable(False, False)
-        
-        # Appearance
+
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
 
-        # Main Layout
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
@@ -39,7 +36,6 @@ class BotApp(ctk.CTk):
         self.main_frame.grid(padx=20, pady=20, sticky="nsew")
         self.main_frame.grid_columnconfigure(0, weight=1)
 
-        # Header
         self.header_label = ctk.CTkLabel(
             self.main_frame, 
             text="🚀 BotServer Control", 
@@ -55,13 +51,12 @@ class BotApp(ctk.CTk):
         )
         self.sub_label.pack(pady=(0, 20))
 
-        # Status Card
         self.status_frame = ctk.CTkFrame(self.main_frame, fg_color=("gray90", "gray16"), corner_radius=10)
         self.status_frame.pack(fill="x", padx=40, pady=10)
-        
+
         self.status_dot = ctk.CTkLabel(self.status_frame, text="●", text_color="yellow", font=("Helvetica", 20))
         self.status_dot.pack(side="left", padx=(15, 5), pady=10)
-        
+
         self.status_text = ctk.CTkLabel(
             self.status_frame, 
             text="Status: Initializing...", 
@@ -69,7 +64,6 @@ class BotApp(ctk.CTk):
         )
         self.status_text.pack(side="left", pady=10)
 
-        # Info Section
         self.info_label = ctk.CTkLabel(
             self.main_frame, 
             text="The bot is starting up. Please wait...", 
@@ -78,7 +72,6 @@ class BotApp(ctk.CTk):
         )
         self.info_label.pack(pady=(20, 10))
 
-        # Action Buttons
         self.button_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         self.button_frame.pack(pady=(10, 20))
 
@@ -95,7 +88,6 @@ class BotApp(ctk.CTk):
         )
         self.stop_button.pack(side="left", padx=10)
 
-        # Background Thread for Bot
         self.loop = None
         self.bot_thread = threading.Thread(target=self.run_bot_async, daemon=True)
         self.bot_thread.start()
@@ -124,11 +116,10 @@ class BotApp(ctk.CTk):
         try:
             bot = Bot(token=TOKEN)
             dp = Dispatcher()
-            
-            # Init databases
+
             user_database()
             categories_database()
-            
+
             dp.include_router(user_router)
 
             self.after(0, lambda: self.update_status("Active", "#2ECC71", "#2ECC71"))

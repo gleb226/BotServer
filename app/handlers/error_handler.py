@@ -19,7 +19,7 @@ async def notify_admin(bot, user_id: int, username: str, command: str, error_mes
 
 def log_error_to_db(user_id: int, username: str, firstname: str, lastname: str, command: str, error_message: str):
     if DATABASE_TYPE == "sqlite":
-        # We can still log to a local file or just ignore for sqlite
+
         pass
     else:
         try:

@@ -78,5 +78,5 @@ def get_storage_plans_keyboard(language="English"):
     for plan_id, plan in STORAGE_PLANS.items():
         label = f"{plan['label']} - {plan['price']} UAH"
         buttons.append([InlineKeyboardButton(text=label, callback_data=f"buy_{plan_id}")])
-    
+
     return InlineKeyboardMarkup(inline_keyboard=buttons)

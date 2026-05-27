@@ -1,10 +1,9 @@
 import os
 from app.common.config import main_categories, USER_FILES_DIR, VERSION
 
-
 def get_folder_path(user_id, category, subcategory_path=None):
     category_path = main_categories[category]["path"]
-    
+
     if VERSION == "personal":
         full_path = os.path.join(USER_FILES_DIR, category_path)
     else:
@@ -18,7 +17,6 @@ def get_folder_path(user_id, category, subcategory_path=None):
             full_path = os.path.join(full_path, subcategory_path)
 
     return full_path
-
 
 def get_user_files(user_id, category, subcategory_path=None):
     full_path = get_folder_path(user_id, category, subcategory_path)
@@ -34,7 +32,6 @@ def get_user_files(user_id, category, subcategory_path=None):
 
     return sorted(files)
 
-
 def delete_file(user_id, category, subcategory_path, filename):
     try:
         full_path = get_folder_path(user_id, category, subcategory_path)
@@ -46,7 +43,6 @@ def delete_file(user_id, category, subcategory_path, filename):
         return False
     except Exception:
         return False
-
 
 def delete_all_files(user_id, category, subcategory_path=None):
     try:
@@ -70,7 +66,6 @@ def delete_all_files(user_id, category, subcategory_path=None):
     except Exception:
         return 0
 
-
 def save_text_to_file(user_id, category, subcategory_path, text):
     full_path = get_folder_path(user_id, category, subcategory_path)
     os.makedirs(full_path, exist_ok=True)
@@ -79,7 +74,6 @@ def save_text_to_file(user_id, category, subcategory_path, text):
 
     with open(file_path, 'a', encoding='utf-8') as f:
         f.write(text + "\n")
-
 
 def is_valid_file_extension(category, extension):
     allowed_extensions = main_categories[category]["extensions"]

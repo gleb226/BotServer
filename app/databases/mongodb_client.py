@@ -4,7 +4,7 @@ from app.common.config import DATABASE_TYPE
 def get_mongodb_collections():
     if DATABASE_TYPE != "mongodb":
         return None, None, None
-        
+
     from pymongo import MongoClient
     from dotenv import load_dotenv
 
