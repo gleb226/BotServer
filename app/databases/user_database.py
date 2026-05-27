@@ -19,7 +19,10 @@ class user_database:
                     chat_id INTEGER,
                     chat_type TEXT,
                     storage_limit_gb REAL DEFAULT 2.0,
-                    joined_at TEXT
+                    joined_at TEXT,
+                    last_payment_date TEXT,
+                    pending_order_id TEXT,
+                    pending_plan_id TEXT
                 )
             ''')
             self.conn.commit()
@@ -52,7 +55,10 @@ class user_database:
                 "chat_id": chat_id,
                 "chat_type": chat_type,
                 "storage_limit_gb": 2.0,
-                "joined_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                "joined_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "last_payment_date": None,
+                "pending_order_id": None,
+                "pending_plan_id": None
             }
             self.collection.insert_one(user_data)
 
@@ -81,13 +87,45 @@ class user_database:
             user = self.collection.find_one({"user_id": user_id})
             return user.get("storage_limit_gb", 2.0) if user else 2.0
 
-    def increase_storage_limit(self, user_id: int, amount_gb: float):
-        current = self.get_storage_limit(user_id)
-        new_limit = current + amount_gb
+    def set_storage_limit(self, user_id: int, limit: float):
         if DATABASE_TYPE == "sqlite":
-            self.cursor.execute("UPDATE users SET storage_limit_gb = ? WHERE user_id = ?", (new_limit, user_id))
+            self.cursor.execute("UPDATE users SET storage_limit_gb = ?, last_payment_date = ? WHERE user_id = ?", 
+                                (limit, datetime.now().strftime("%Y-%m-%d"), user_id))
             self.conn.commit()
         else:
-            self.collection.update_one({"user_id": user_id}, {"$set": {"storage_limit_gb": new_limit}})
+            self.collection.update_one({"user_id": user_id}, {
+                "$set": {
+                    "storage_limit_gb": limit,
+                    "last_payment_date": datetime.now().strftime("%Y-%m-%d")
+                }
+            })
+
+    def set_pending_payment(self, user_id: int, order_id: str, plan_id: str):
+        if DATABASE_TYPE == "sqlite":
+            self.cursor.execute("UPDATE users SET pending_order_id = ?, pending_plan_id = ? WHERE user_id = ?", (order_id, plan_id, user_id))
+            self.conn.commit()
+        else:
+            self.collection.update_one({"user_id": user_id}, {"$set": {"pending_order_id": order_id, "pending_plan_id": plan_id}})
+
+    def get_pending_payments(self):
+        if DATABASE_TYPE == "sqlite":
+            self.cursor.execute("SELECT user_id, pending_order_id, pending_plan_id FROM users WHERE pending_order_id IS NOT NULL")
+            return self.cursor.fetchall()
+        else:
+            return list(self.collection.find({"pending_order_id": {"$ne": None}}, {"user_id": 1, "pending_order_id": 1, "pending_plan_id": 1}))
+
+    def clear_pending_payment(self, user_id: int):
+        if DATABASE_TYPE == "sqlite":
+            self.cursor.execute("UPDATE users SET pending_order_id = NULL, pending_plan_id = NULL WHERE user_id = ?", (user_id,))
+            self.conn.commit()
+        else:
+            self.collection.update_one({"user_id": user_id}, {"$set": {"pending_order_id": None, "pending_plan_id": None}})
+
+    def get_all_users_with_subscription(self):
+        if DATABASE_TYPE == "sqlite":
+            self.cursor.execute("SELECT user_id, last_payment_date, storage_limit_gb, language FROM users WHERE storage_limit_gb > 2.0")
+            return self.cursor.fetchall()
+        else:
+            return list(self.collection.find({"storage_limit_gb": {"$gt": 2.0}}))
 
 db = user_database()

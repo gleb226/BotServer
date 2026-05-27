@@ -75,6 +75,14 @@ def save_text_to_file(user_id, category, subcategory_path, text):
     with open(file_path, 'a', encoding='utf-8') as f:
         f.write(text + "\n")
 
+def clear_user_data(user_id):
+    if VERSION == "personal": return
+    import shutil
+    path = os.path.join(USER_FILES_DIR, str(user_id))
+    if os.path.exists(path):
+        shutil.rmtree(path)
+        os.makedirs(path, exist_ok=True)
+
 def is_valid_file_extension(category, extension):
     allowed_extensions = main_categories[category]["extensions"]
     return extension in allowed_extensions
